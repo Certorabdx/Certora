@@ -11,32 +11,32 @@
 
 **Positioning:** mature security and developer-infrastructure product. Not a generic Web3 dashboard, not a token-trading interface, not a hackathon prototype.
 
-**Color palette (design tokens):**
-- Background: deep graphite (`#0b0f14` / `#121821`)
-- Surface: charcoal / dark slate (`#171f28`, `#1e2733`)
-- Primary accent: restrained Beldex-inspired gold/amber (`#d9a43c`) — used sparingly for primary actions and active states
-- Success: muted green (`#4a9e6b`)
-- Warning: amber (`#e8a33d`)
-- Critical: controlled red (`#c95252`)
-- Text: high-contrast off-white (`#e8eef4`)
-- Secondary text: muted grey (`#93a3b2`)
-- Borders: subtle (`#2a3340`)
+**Color palette (implemented tokens):**
+- Canvas / ink: `#08090B` / `#0A0C0F`
+- Surface / raised: `#101318` / `#151A21`
+- Borders: `#22262E` (default) / `#2E343E` (strong)
+- Primary text: warm off-white `#F3F0E8`
+- Secondary / muted text: `#A9A69D` / `#77746C`
+- Accent: amber `#E7B36A` (soft `#F1C98F`, deep `#B9873F`), used sparingly for primary actions and active states
+- Success: `#7FC8A0`
+- Warning: `#E7A75E`
+- Critical: `#E27C6D`
 
-**Typography:** Geist (headings + UI), Inter (body / addresses). Monospace for addresses (Geist Mono / JetBrains Mono).
+**Typography:** Instrument Serif for display headlines, Geist for UI text, Geist Mono for addresses and fingerprints.
 
-**Icons:** Lucide React, used consistently (one icon style, 16–20px).
+**Icons:** Lucide React, one style, 16–20px.
 
-**Radii / spacing / elevation:** consistent small radii (6–8px), 4px spacing grid, subtle shadow elevation for surfaces, no exaggerated gradients, no excessive glass effects, no large decorative graphics, no artificial dashboard statistics.
+**Radii / spacing / elevation:** 7–22px radii, 4px spacing grid, restrained inset card shadows and popover elevation. No decorative gradients, glass effects, fake statistics, or ornamental charts.
 
 **Status semantics (never color-only):**
-- Success: green + icon + "Matches your previously approved recipient" text
-- Warning: amber + icon + "Destination changed since approval" text
+- Success: green + icon + "Matches your approved recipient"
+- Warning: amber + icon + "Destination changed since approval"
 - Critical: red + icon + clear actionable message
 - Neutral/info: slate + icon
 
 ## Layout
-- Desktop: ~240–260px sidebar, compact top header, page title, persistent network/testnet status, main content with max-width, consistent spacing.
-- Mobile: collapsible sidebar navigation, compact header, responsive cards/tables, usable dialogs, readable addresses, no horizontal overflow.
+- Desktop: 248px fixed sidebar, compact top header, page title, persistent network/testnet status, centered content column with consistent spacing.
+- Mobile: slide-in drawer navigation, compact header, responsive cards and dialogs, readable addresses, no horizontal overflow.
 
 ## Navigation
 1. Overview
@@ -51,14 +51,13 @@ No navigation for unimplemented future features.
 Reusable primitives separated from product features:
 - Buttons (primary, secondary, ghost, danger)
 - Inputs
-- Cards
-- Tables
+- Cards and list rows
 - Dialogs / confirmation dialogs
 - Toasts
-- Loading spinners / skeletons
+- Loading spinners
 - Error states
 - Empty states
-- Address copy button with feedback
+- Address display and copy actions with feedback
 - Testnet indicator badge
 - Wallet connection status
 

@@ -2,7 +2,7 @@
 
 **Scope:** Certora Testnet MVP — BNS resolution, explicit recipient pinning, fresh rechecks, destination-change detection, and explicit reapproval.
 
-**Status:** Design-level review. This is not a formal security audit. No live Testnet validation has been performed.
+**Status:** Design-level review. This is not a formal security audit. Partial real Testnet evidence exists (connection, validation, negative lookups); the full BNS change-detection cycle has not been validated.
 
 ## 1. Assets
 
@@ -43,7 +43,7 @@ Certora does **not** hold private keys, seed phrases, signing capability, or fun
 - The full destination is displayed before approval; the user must explicitly approve it.
 - The pin comparison is exact and case-preserving.
 
-**Residual risk:** A compromised resolver or wallet can return a wrong address that the user approves. Certora cannot detect this without independent on-chain verification, which the SDK does not provide.
+**Residual risk:** A compromised resolver or wallet can return a wrong address that the user approves. Certora cannot detect this without independent on-chain verification, which the SDK does not provide. The resolved address is passed through the SDK's `checkAddress(..., 'testnet')`, but that check is currently informational: a failed shape check does not block display or pinning.
 
 ### T2. Silent destination change after approval
 
@@ -145,7 +145,7 @@ Certora does **not** hold private keys, seed phrases, signing capability, or fun
 **Mitigations:**
 - Mock mode requires `import.meta.env.DEV` and is compiled out of production builds.
 - Mock wallet is labeled test/E2E-only in source and exposed only for Playwright.
-- Documentation and the validation report explicitly state that no live evidence exists.
+- Documentation and the validation report distinguish mock evidence from the partial real Testnet evidence (connection, validation matrix, fresh negative lookups).
 - The app never writes fabricated tx hashes or verification claims.
 
 **Residual risk:** A developer can still run a dev build with mock data and misinterpret it; documentation and labeling are the controls.
@@ -183,7 +183,7 @@ Certora does **not** claim:
 
 ## 6. Open items before any production use
 
-1. Perform the live Testnet validation in `docs/testnet-runbook.md` and record evidence.
+1. Complete the full live Testnet change-detection validation in `docs/testnet-runbook.md` and record the evidence. Partial read-only evidence already exists in `docs/testnet-validation.md`.
 2. Obtain an independent security review of the adapter, storage, and UI trust disclosures.
 3. Add dependency scanning and lockfile review.
 4. Decide whether background/polling rechecks are in scope and document their privacy/performance implications.

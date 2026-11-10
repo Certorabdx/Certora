@@ -2,7 +2,7 @@
 
 ## Module Boundaries
 
-Certora separates the **Beldex adapter** (provider/wallet/resolver/network interaction) from the **core** (fingerprinting, comparison, recipient storage, policies). The core is independently testable without a real wallet provider.
+Certora separates the **Beldex adapter** (provider, wallet, and resolver interaction) from the **core** (fingerprinting, comparison, recipient storage, policies). The core is independently testable without a real wallet provider.
 
 ```
 +---------------------+         +---------------------------+
@@ -14,16 +14,15 @@ Certora separates the **Beldex adapter** (provider/wallet/resolver/network inter
 +---------------------+                    |
 |   Beldex Adapter    |--------------------+
 |  (provider, wallet, |
-|   resolver, network)|
+|      resolver)      |
 +---------------------+
 ```
 
 ### beldex-adapter
 Responsible for all actual provider interaction and data conversion:
-- `provider.ts` — `detectProvider()`, `BeldexProvider` lifecycle, `PostMessageProvider` wrap.
+- `provider.ts` — `discoverProvider()` (wraps the SDK's `detectProvider()` with a timeout) and `normalizeError()` for structured adapter errors.
 - `wallet.ts` — `BeldexWeb3` wrapper: connect, disconnect, address/network getters, event subscription, testnet verification.
-- `resolver.ts` — `resolveBns(name)`, input validation, response validation, timing, structured `BnsResolution` output.
-- `network.ts` — `checkAddress` for testnet-shaped destinations, `Nettype` narrowing.
+- `resolver.ts` — `resolveBns(web3, name, network)`, input validation, response validation, timing, structured `BnsResolution` output. Uses the SDK's `checkAddress`/`isValidAddressShape` helpers; the address shape check is informational and does not block a result.
 
 ### core
 Pure, provider-independent logic:
@@ -35,10 +34,10 @@ Pure, provider-independent logic:
 
 ## Data Flow — Resolution
 1. User enters a BNS name (e.g. `merchant.bdx`).
-2. Adapter validates name (suffix, length, characters).
-3. Adapter confirms wallet connected + testnet.
-4. Adapter calls `web3.resolveBns(name)`, measures duration.
-5. Adapter validates the result (`address` present, testnet-shaped via `checkAddress`).
+2. `useResolver` requires a connected wallet and `network === 'testnet'`; otherwise it returns an error without calling the adapter.
+3. Adapter validates the name (suffix, length, characters).
+4. Adapter calls `web3.resolveBns(name)` and measures duration.
+5. Adapter requires an address, then runs `checkAddress(address, 'testnet')` as an informational check; a shape failure does not block display or pinning.
 6. Returns `BnsResolution { name, destination, network: 'testnet', mappingType: 'wallet', verified: false, resolvedAt, durationMs }`.
 
 ## Data Flow — Pinning
@@ -70,6 +69,6 @@ A single `WalletProvider` (`src/state/WalletProvider.tsx`) owns the adapter, pro
 - Never silently replace an existing pin.
 - A changed destination requires an explicit confirmation dialog; reapproval updates the existing pin in place.
 - A failed/uncertain resolution never becomes an approved recipient.
-- Mainnet is rejected; testnet required for all write operations.
+- Mainnet is blocked for resolution, pinning, and rechecks; Testnet is required for all writes.
 - Local pins are approval evidence, not authenticity proofs.
 - Mock mode is development-only and can never be enabled in a production build.

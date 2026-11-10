@@ -14,7 +14,7 @@
 declare function detectProvider(opts?: { timeoutMs?: number }): Promise<BeldexProvider | null>
 ```
 - Resolves with the Beldex Wallet provider, or `null` if none announced within `timeoutMs` (default 3000 ms).
-- Render "Install Beldex Wallet" CTA when null.
+- Certora displays a "Wallet not detected" state when `null`.
 
 ### BeldexProvider interface
 ```ts
@@ -91,7 +91,7 @@ declare function checkAddress(address: string, expectedNetwork?: Nettype): Addre
 declare function isValidAddressShape(address: string, expectedNetwork?: Nettype): boolean
 type AddressCheck = { valid: boolean; kind?: 'standard' | 'integrated'; network?: Nettype; reason?: string }
 ```
-- Use `checkAddress(address, 'testnet')` to confirm a resolved destination is a testnet-shaped address before displaying/pinning.
+- `checkAddress(address, 'testnet')` reports whether a destination is Testnet-shaped. Certora records the result but does not block display or pinning on it.
 
 ## Unit Conversion
 ```ts
@@ -111,12 +111,12 @@ Subscribable via `web3.on(event, listener)`:
 - `networkChanged` → `{ nettype: string }`
 - `balanceChanged`, `lock`, `unlock`
 
-Certora uses `connect`, `disconnect`, `accountsChanged`, and `networkChanged` to re-verify testnet status and reset session state.
+Certora subscribes to `connect`, `disconnect`, `accountsChanged`, and `networkChanged` to update connection state. The UI re-evaluates Testnet gating whenever that state changes; it does not call the resolver on a non-Testnet connection.
 
-## Trust Limitations (Documented per Rule 5)
+## Trust Limitations
 1. **`verified` is always `false`** — BNS resolution is not independently verified on-chain. The wallet's configured HTTPS resolver is the trust anchor.
 2. Certora must **never** label results as cryptographically verified, trustless, blockchain-proof, or guaranteed safe.
-3. Accurate descriptions: "Resolved through Beldex Wallet", "Matches previously approved destination", "Destination changed since approval", "Independent on-chain verification unavailable".
+3. Accurate descriptions: "Resolved through Beldex Wallet", "Matches your approved recipient", "Destination changed since approval", "Independent on-chain verification unavailable".
 4. Recipient pinning is evidence of previous user approval, **not** proof of identity or authenticity.
 
 ## BNS Owner-Side Methods (Manual Testnet Demonstration Only)
@@ -126,12 +126,12 @@ These are performed by the owner using the official Beldex Wallet / marketplace,
 - `bns_hash_name` — hash a BNS name
 - `bns_known_names` — query known names
 
-Certora never calls these. The mapping change in Experiment C is performed outside Certora via the owner-controlled testnet wallet.
+Certora never calls these. The mapping change used for validation is performed outside Certora through the official wallet/BNS tooling described in `docs/testnet-runbook.md`.
 
 ## Network Requirements
 - Certora operates **exclusively on Beldex Testnet** (`Nettype === 'testnet'`).
 - Detect actual wallet network via `web3.network` and `bdx_getNetwork`.
-- Reject Mainnet; never silently switch networks; never fall back to a Mainnet endpoint.
+- Block Mainnet for resolution, pinning, and rechecks; never silently switch networks; never fall back to a Mainnet endpoint.
 - Recheck network following account or network changes (subscribe to `accountsChanged` and `networkChanged`).
 - Disable recipient approval when the network cannot be confirmed.
 - Persistent Testnet indicator shown in the UI.

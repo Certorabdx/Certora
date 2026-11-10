@@ -2,9 +2,11 @@
 
 **Beldex Testnet BNS resolution and recipient-change protection.**
 
+Repository: https://github.com/Certorabdx/Certora
+
 Certora resolves Beldex Name Service (BNS) names through the Beldex Wallet, lets you explicitly approve and pin the resulting destination, and warns you when a later fresh resolution returns a different address. It is a protection layer around recipient selection: it does not send payments and never asks for wallet secrets.
 
-> **Status:** This is a Testnet MVP. The full workflow has been exercised with a mocked wallet provider in automated tests. A **partial live Testnet test** also succeeded: the official Beldex Wallet extension connected on Testnet, and a real BNS lookup failed safely without creating a pin. A **read-only Testnet dry run** then passed 8/8 validation cases and 7/7 fresh negative lookups — each lookup was a distinct `bdx_resolveBns` wallet RPC, zero pins were created, and no approval/signing prompt appeared. **The full BNS change-detection cycle has not been validated on Testnet**: the public faucet is CAPTCHA-gated, pays 205 tBDX per 24 h, and a one-year Testnet BNS registration costs 650 tBDX; the public Testnet currently has zero BNS records. See [docs/testnet-validation.md](docs/testnet-validation.md) and [docs/testnet-runbook.md](docs/testnet-runbook.md).
+> **Status:** Testnet MVP. Automated tests cover the full flow with a mocked provider. On real Beldex Testnet, the official extension connected and a read-only dry run passed **8/8 validation cases** and **7/7 fresh lookups** (all `name not registered`, zero pins, no signing prompt). **The full BNS change-detection cycle has not been validated on Testnet:** the faucet is CAPTCHA-gated and pays 205 tBDX per 24 h, a one-year BNS registration costs 650 tBDX, and public Testnet has zero BNS records. See [Testnet validation](docs/testnet-validation.md) and the [runbook](docs/testnet-runbook.md).
 
 ## Why
 
@@ -15,7 +17,7 @@ Core guarantees:
 - **No automatic pin replacement.** A changed destination is only stored after an explicit approval dialog.
 - **Fresh resolution on every recheck.** Cached resolution results are never reused for change detection.
 - **Failed resolution preserves the pin.** A failed or uncertain lookup yields `RESOLUTION_UNAVAILABLE`; the approved pin is untouched.
-- **Testnet only.** Mainnet connections are rejected and never silently switched.
+- **Testnet only.** Mainnet is blocked for resolution, pinning, and rechecks; Certora never switches networks.
 - **Honest verification.** The SDK returns `verified: false`; Certora displays this limitation instead of claiming on-chain verification.
 - **No payments, no secrets.** Certora never signs or sends transactions and never requests seed phrases or private keys.
 
@@ -62,10 +64,8 @@ Verified in this workspace:
 | Unit tests | 27/27 pass |
 | E2E tests | 3/3 pass (mocked provider only) |
 | Production build | Pass |
-| Live Testnet wallet connection | Partial — real extension, real Testnet address |
-| Read-only Testnet dry run | 8/8 validation + 7/7 fresh negative lookups; 0 pins |
-| Live Testnet BNS lookup | Partial — real negative lookups only (`name not registered`) |
-| Full Testnet change-detection cycle | **Not performed** — faucet CAPTCHA + 650 tBDX BNS fee |
+| Real Testnet connection + read-only dry run | Pass — 8/8 validation, 7/7 fresh negative lookups, 0 pins |
+| Full Testnet change-detection cycle | **Not performed** — see blockers above |
 
 ## Mock mode (development/E2E only)
 
@@ -77,11 +77,7 @@ Appending `?mock=1` in a development build installs a fake wallet provider so UI
 
 ## Brand and interface
 
-The interface follows a “warm private ledger” direction: near-black warm surfaces, Instrument Serif headlines, Geist UI text, Geist Mono for addresses and fingerprints, and a restrained amber accent. Fonts are self-hosted in `public/fonts/`; no third-party font requests are made at runtime.
-
-The brand mark is a **sealed destination**: a wax-seal silhouette with a masked destination-pin cutout. It is implemented in `src/components/ui/LogoMark.tsx` and mirrored as static app icons (`public/favicon.svg`, PNG favicons, Apple touch icon, PWA icons, and `site.webmanifest`). If the mark geometry changes, update the SVG icon in parallel.
-
-Screenshots used during design review were produced in mock mode and are visual evidence only, not Testnet evidence.
+The interface uses a warm near-black palette, Instrument Serif headlines, Geist UI text, Geist Mono for addresses and fingerprints, and a restrained amber accent. Fonts are self-hosted in `public/fonts/`; the app makes no third-party font requests at runtime. The brand mark is a “sealed destination” in `src/components/ui/LogoMark.tsx`, mirrored as static app and PWA icons. If the mark geometry changes, update the SVG and icon set together.
 
 ## Screens
 
@@ -139,6 +135,6 @@ Fingerprint input: `certora-v1` + network + name + mapping type + exact destinat
 - [Testnet validation status](docs/testnet-validation.md)
 - [Repository audit](docs/repository-audit.md)
 
-## License / use
+## Use
 
-Internal MVP. No deployment was performed. Do not use with Mainnet funds. Validate on Testnet first.
+MVP; no hosted deployment. Testnet only. Do not use with Mainnet funds.

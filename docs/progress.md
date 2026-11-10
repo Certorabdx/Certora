@@ -3,7 +3,7 @@
 ## Environment
 - Greenfield build in `C:\Users\HP\Documents\Certora`.
 - Node v24.20.0, npm 11.19.0, Windows.
-- No git repository, commits, pushes, deployment, or transferred funds.
+- Repository published at `https://github.com/Certorabdx/Certora` (`main`); no deployment and no real fund movements.
 
 ## Phase 0 — Repository audit
 - Inspected the workspace: empty directory, no existing work to preserve.
@@ -55,7 +55,7 @@
 ## Phase 8 — Automated verification (2026-11-10)
 - `npx tsc --noEmit` — pass.
 - `npx eslint src packages tests --ext ts,tsx --max-warnings 0` — pass, 0 warnings.
-- `npx vitest run` — 4 files, **26/26 tests pass**:
+- `npx vitest run` — 4 files, **26/26 tests pass** (baseline before the Phase 12 regression test; now 27/27):
   - fingerprint 3
   - comparison 9
   - recipient store 7
@@ -84,7 +84,7 @@
 - Re-ran verification after the redesign and brand work:
   - `npx tsc --noEmit` — pass.
   - ESLint — pass, 0 warnings.
-  - Vitest — **26/26 tests pass**.
+  - Vitest — **26/26 tests pass** (at that time; now 27/27).
   - Playwright — **3/3 mock-provider E2E tests pass**.
   - `npm run build` — pass; mock-wallet strings verified absent from the production bundle; fonts and icons present in `dist/`.
 
@@ -102,7 +102,7 @@
   - `Beldex-Coin/beldex` `src/beldex_economy.h` sets the HF18+ one-year BNS fee to 500 BDX + 30% = **650 tBDX**; Testnet shortens the registration duration, not the price.
 - Balance remained **0 tBDX**. No BNS name was registered, no mapping was updated, and no transaction was sent.
 - Rewrote `docs/testnet-validation.md` with the partial live evidence and exact blockers; updated `README.md` and `docs/testnet-runbook.md` accordingly.
-- No code changes were required; the previously verified 26 unit tests, 3 mock E2E tests, and production build remain the code-verification baseline.
+- No code changes were required; the previously verified 26 unit tests (now 27/27), 3 mock E2E tests, and production build remained the code-verification baseline.
 
 ## Phase 12 — Read-only Testnet dry run (2026-11-10)
 - Ran a real, read-only validation matrix against Beldex Testnet through the official extension. No faucet funds, transactions, or signing were involved.
@@ -127,9 +127,17 @@
   - `npm run build` — pass; mock strings absent from the production JS bundle.
 - Evidence artifacts are in the temporary folder outside the repo (`dry-test-results.json` and `dry-*.png`). They are read-only Testnet evidence, not proof of a completed BNS change cycle.
 
+## Phase 13 — Final documentation polish (2026-11-10)
+- Audited `README.md` and every file in `docs/` against the current code and recorded evidence.
+- Removed stale claims: non-existent `network.ts`, `PostMessageProvider` references, “no live Testnet validation”, “no Git history”, and obsolete test counts.
+- Corrected the architecture and resolution flow to match the code: the UI gates wallet/Testnet before calling the adapter, and the address shape check is informational and non-blocking.
+- Updated the UI research document to the implemented warm near-black palette and Instrument Serif / Geist / Geist Mono typography.
+- Updated the implementation checklist, runbook status, repository audit, and validation report to the published-repository state.
+- Documentation-only change; no application code or behavior changed.
+
 ## Outstanding
 - **Full real Beldex Testnet BNS validation remains unperformed.** A live wallet connection, a read-only dry run, and real negative BNS lookups were obtained, but there is still no owner-controlled Testnet BNS name, funded balance, mapping update, transaction hash, explorer link, or detected change/reapproval cycle.
 - Remaining blockers: the faucet Turnstile challenge requires human interaction, the faucet pays 205 tBDX per 24 h versus a 650 tBDX one-year BNS fee, and public Testnet currently has zero BNS records.
 - To complete validation, fund the temporary address with **≥650 tBDX plus fees** (or manually solve the faucet CAPTCHA across multiple days, which still does not solve the zero-name problem), register a Testnet BNS name, then follow `docs/testnet-runbook.md` and record the real transaction hash and explorer link in `docs/testnet-validation.md`.
 - The mock E2E tests verify UI/workflow wiring only and are explicitly not live evidence.
-- No commits, pushes, deployments, or real fund movements were performed.
+- No deployment or real fund movements occurred. Repository: `https://github.com/Certorabdx/Certora`.

@@ -16,7 +16,7 @@ This runbook describes how to perform the **real** Beldex Testnet validation of 
 These checks were completed on real Testnet and can be repeated before funding:
 
 1. Connect the extension on **Testnet** and open Certora without `?mock=1`.
-2. Enter invalid names (`merchant`, `Merchant.BDX`, `bad name.bdx`, `mer.bdx`, `mer--chant.bdx`, `.bdx`, over-length). Expect an inline reason and a disabled **Resolve** button, with no wallet prompt.
+2. Enter invalid names (`merchant`, `Merchant.BDX`, `bad name.bdx`, `mеrchant.bdx` with a Cyrillic `е`, `mer--chant.bdx`, `.bdx`, over-length). Expect an inline reason and a disabled **Resolve** button, with no wallet prompt.
 3. Resolve several unregistered names (`merchant.bdx`, `bob.bdx`, `toretto.bdx`, `my-shop.bdx`, `a.bdx`). Expect `BNS resolution failed: name not registered`; no resolution receipt and no **Approve & pin** control.
 4. Resolve the same name twice. Confirm two distinct `bdx_resolveBns` wallet calls — not a cached result.
 5. Open **Protected Recipients** and confirm it is empty / IndexedDB `recipientPins` count is 0.
@@ -65,7 +65,7 @@ npm test
 npm run build
 ```
 
-Record the commit/build identifier if the workspace is under version control. This repository currently has no Git history; record the date and file inventory instead.
+Record the repository commit identifier (`git rev-parse HEAD`) and build identifier. The repository is published at `https://github.com/Certorabdx/Certora`; never present mock evidence as Testnet evidence.
 
 ## 3. Validation procedure
 
@@ -239,14 +239,14 @@ Collect the following in a secure location:
    - final `MATCHES_PIN`.
 6. Any errors encountered and how they were resolved.
 
-Update `docs/testnet-validation.md` with the real evidence. Until then, its status remains **NOT PERFORMED**.
+Update `docs/testnet-validation.md` with the real evidence. Until the full cycle is performed, its verdict remains **FULL BNS CHANGE-DETECTION VALIDATION NOT PERFORMED**; the partial read-only evidence in §3.1 stays separate from the missing change-detection evidence.
 
 ## 5. Troubleshooting
 
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
 | "Wallet not detected" | Extension missing, disabled, or different browser profile | Install/unlock the official extension, reload, confirm provider detection |
-| Connect button absent | Provider not detected within 3 s | Unlock the extension, reload the page, check the extension is allowed on this origin |
+| Connect button absent | Provider not detected within 5 s | Unlock the extension, reload the page, check the extension is allowed on this origin |
 | "You declined the request" | Connection/approval rejected in wallet | Retry and approve in the wallet |
 | "Wallet is locked" | Extension locked | Unlock the wallet and retry |
 | Mainnet rejection | Wallet on Mainnet | Switch the wallet to Testnet manually; Certora will not switch it |

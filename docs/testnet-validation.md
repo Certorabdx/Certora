@@ -2,7 +2,7 @@
 
 **Date of this report:** 2026-11-10
 
-**Verdict: FULL BNS CHANGE-DETECTION VALIDATION NOT PERFORMED. A partial live Testnet connection test was performed and is documented in §3.**
+**Verdict: FULL BNS CHANGE-DETECTION VALIDATION NOT PERFORMED. A partial live Testnet validation (connection, read-only dry run, negative lookups) was performed and is documented in §3.**
 
 No BNS registration, initial mapping, mapping update, transaction hash, explorer link, funded balance, or pin/change/reapproval cycle was obtained. The partial evidence below proves that Certora can connect to the real Beldex Wallet extension on Testnet, that the read-only validation and failure path works across repeated fresh lookups, and that failed lookups do not create pins. It is **not** evidence that the full protection flow works on Testnet.
 
@@ -13,7 +13,7 @@ No BNS registration, initial mapping, mapping update, transaction hash, explorer
 | Core fingerprinting | Vitest unit tests | 3/3 pass |
 | Comparison/status engine | Vitest unit tests | 9/9 pass |
 | IndexedDB recipient store | Vitest + fake-indexeddb | 7/7 pass |
-| BNS input validation | Vitest unit tests | 7/7 pass |
+| BNS input validation | Vitest unit tests | 8/8 pass |
 | TypeScript | `tsc --noEmit` | Pass |
 | ESLint | `eslint src packages tests` | Pass, 0 warnings |
 | Production build | `vite build` | Pass |
@@ -150,5 +150,5 @@ Only after those steps produce real evidence may this document state that Certor
 - No background monitoring exists; change detection requires a manual recheck.
 - Pins are local approval evidence, not identity or authenticity proofs.
 - Mock mode is compiled out of production builds and must never be used as evidence.
-- There is no deployment or published build; validation must use the local dev/`preview` build described in the runbook.
+- There is no hosted deployment or published build; validation must use the local dev/`preview` build described in the runbook. The source is published at `https://github.com/Certorabdx/Certora`.
 - Testnet BNS supply and faucet conditions are external and can change; the observations above are dated 2026-11-10.

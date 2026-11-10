@@ -11,20 +11,21 @@ Certora — Beldex Testnet BNS Resolution and Recipient Protection MVP
 | 1 | Beldex technical research | docs/technical-research.md, docs/architecture.md |
 | 2 | UI/UX research & design system | docs/ui-research.md |
 | 3 | Application foundation | Responsive shell, routing, layout, design tokens |
-| 4 | Beldex wallet integration | Wallet connects; Mainnet rejected (live validation pending) |
-| 5 | BNS resolution engine | Fresh resolution + full destination display (live validation pending) |
+| 4 | Beldex wallet integration | Wallet connects; Mainnet blocked (real Testnet connection verified) |
+| 5 | BNS resolution engine | Fresh resolution + full destination display (real negative lookups verified; positive resolution pending) |
 | 6 | Recipient fingerprinting & pinning | IndexedDB persistence; pin survives reload |
 | 7 | Destination-change detection | DESTINATION_CHANGED status; explicit reapproval |
 | 8 | Complete product interface | All 6 screens implemented, responsive |
-| 9 | Real testnet experiment | Full CONNECT → RESOLVE → PIN → CHANGE → DETECT → REAPPROVE (partial: real connection + negative lookup only) |
+| 9 | Real testnet experiment | Full CONNECT → RESOLVE → PIN → CHANGE → DETECT → REAPPROVE (partial: real connection, 8/8 dry-run validation, 7/7 fresh negative lookups; full cycle outstanding) |
 | 10 | Testing & security review | Unit + E2E tests pass; threat model written |
 | 11 | Final QA | typecheck, lint, test, build all pass |
+| 12 | Documentation polish & publication | Docs audited; repository published on `main` |
 
 ## Checklist Legend
 
 - `[x]` — implemented and verified by typecheck, unit tests, mocked E2E, build, or direct code/UI review.
-- Unchecked items require a live Beldex Testnet wallet/name or were intentionally not performed.
-- **Checked does not mean live-tested.** See `docs/testnet-validation.md`: partial live evidence exists (real extension connection, real negative BNS lookup), but no positive resolution or change-detection cycle was performed.
+- Unchecked items require an owner-controlled, funded Testnet BNS name or were intentionally not performed.
+- **Checked does not mean live-tested.** See `docs/testnet-validation.md`: partial live evidence exists (real extension connection, 8/8 dry-run validation, 7/7 fresh negative lookups), but no positive resolution or change-detection cycle was performed.
 
 ## Checklist (Part 7)
 
@@ -112,7 +113,7 @@ Certora — Beldex Testnet BNS Resolution and Recipient Protection MVP
 - [x] No dead buttons or fake actions (notification placeholder removed)
 
 ### G. Actual testnet demonstration
-- [ ] Owner-controlled testnet wallet prepared
+- [x] Owner-controlled testnet wallet prepared (temporary Testnet account; public address recorded, balance 0 tBDX)
 - [ ] Testnet recipient A available
 - [ ] Testnet recipient B available
 - [ ] Test BNS name registered or prepared
@@ -128,7 +129,7 @@ Certora — Beldex Testnet BNS Resolution and Recipient Protection MVP
 - [ ] User explicitly approves Recipient B
 - [ ] Pin updates successfully
 - [ ] Subsequent resolution returns MATCHES_PIN
-- [ ] Real testnet validation documented (partial evidence documented; full cycle outstanding)
+- [x] Real testnet validation documented (partial evidence documented; full cycle outstanding)
 
 ### H. Testing and quality
 - [x] Unit tests implemented
@@ -138,7 +139,7 @@ Certora — Beldex Testnet BNS Resolution and Recipient Protection MVP
 - [ ] Dedicated integration test suite (workflow covered by mocked E2E instead)
 - [x] End-to-end mock-provider tests pass (3/3)
 - [x] Real Testnet read-only dry run pass (8/8 validation, 7/7 negative lookups)
-- [ ] Real testnet validation performed (partial only: live connection + negative BNS lookups)
+- [ ] Full real testnet change-detection validation performed (partial only: live connection, validation matrix, negative BNS lookups)
 - [x] TypeScript checks pass
 - [x] Lint checks pass (0 warnings)
 - [x] Production build passes
@@ -155,14 +156,15 @@ Certora — Beldex Testnet BNS Resolution and Recipient Protection MVP
 - [x] Technical research documented
 - [x] Implementation plan updated
 - [x] Testnet runbook completed
-- [ ] Testnet evidence recorded (none obtained)
+- [x] Testnet evidence recorded (partial real evidence in `docs/testnet-validation.md`; full cycle outstanding)
 - [x] Known limitations documented
 - [x] Installation instructions verified
 - [x] Local development instructions verified
 - [x] Final completion report produced
 
 ## Notes
-- No git commits, pushes, or deployments unless explicitly authorized.
+- Committed and pushed to `https://github.com/Certorabdx/Certora` (`main`); no deployment was performed.
+- No real fund movements, BNS registration, mapping update, or transactions occurred.
 - No fabricated blockchain data anywhere in the application.
-- Mock mode is E2E/development only and is never live testnet evidence.
-- Real Testnet validation remains outstanding; see `docs/testnet-runbook.md` and `docs/testnet-validation.md`.
+- Mock mode is E2E/development only and is never live Testnet evidence.
+- Full real Testnet change-detection validation remains outstanding; see `docs/testnet-runbook.md` and `docs/testnet-validation.md`.

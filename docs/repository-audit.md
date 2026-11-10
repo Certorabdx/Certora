@@ -20,6 +20,13 @@ None. No existing source, UI components, tests, scripts, or git history was foun
 - Testing: Vitest (unit) + Playwright (E2E with a mock provider).
 - Local storage: IndexedDB (raw `idb`-style wrapper, no extra heavy dependency where avoidable).
 
+## Current repository state
+- Git repository initialized on branch `main`; remote: `https://github.com/Certorabdx/Certora`.
+- Initial history was published in three commits (application, tests, documentation), followed by a documentation polish commit.
+- `.gitignore` excludes `node_modules/`, `dist/`, Playwright output, environment files, private keys, certificates, and logs.
+- No wallet secrets, credentials, build output, or test artifacts are committed.
+- No deployment, hosted build, or real fund movement occurred.
+
 ## References consulted
 - @bdxi/web3js v1.0.2 package (installed locally; `dist/index.d.ts` and `dist/units-BUm1-jX-.d.ts` read in full)
 - Beldex Web3JS SDK GitHub: https://github.com/Beldex-Coin/bdx-web3js
