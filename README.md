@@ -2,8 +2,6 @@
 
 **Beldex Testnet BNS resolution and recipient-change protection.**
 
-Repository: https://github.com/Certorabdx/Certora
-
 Certora resolves Beldex Name Service (BNS) names through the Beldex Wallet, lets you explicitly approve and pin the resulting destination, and warns you when a later fresh resolution returns a different address. It is a protection layer around recipient selection: it does not send payments and never asks for wallet secrets.
 
 > **Status:** Testnet MVP. Automated tests cover the full flow with a mocked provider. On real Beldex Testnet, the official extension connected and a read-only dry run passed **8/8 validation cases** and **7/7 fresh lookups** (all `name not registered`, zero pins, no signing prompt). **The full BNS change-detection cycle has not been validated on Testnet:** the faucet is CAPTCHA-gated and pays 205 tBDX per 24 h, a one-year BNS registration costs 650 tBDX, and public Testnet has zero BNS records. See [Testnet validation](docs/testnet-validation.md) and the [runbook](docs/testnet-runbook.md).
