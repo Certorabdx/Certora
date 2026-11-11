@@ -43,6 +43,17 @@ npm run preview
 
 The mock wallet is compiled out of production builds.
 
+## Deploy on Vercel
+
+The repository is ready for a direct Vercel import from GitHub; no environment variables are required.
+
+1. In Vercel, choose **Add New → Project** and import `Certorabdx/Certora`.
+2. Keep the root directory `./` and the detected **Vite** preset.
+3. Install with `npm ci`, build with `npm run build`, and output to `dist`.
+4. Deploy. Pushes to `main` create production deployments.
+
+[`vercel.json`](vercel.json) adds the SPA rewrite required by React Router, security headers, and immutable caching for hashed assets. See [Vercel deployment](docs/vercel-deployment.md) for the full checklist, rollback, and boundaries. A Vercel URL is a hosting endpoint, not Testnet validation evidence.
+
 ## Tests
 
 ```bash
@@ -132,7 +143,8 @@ Fingerprint input: `certora-v1` + network + name + mapping type + exact destinat
 - [Testnet runbook](docs/testnet-runbook.md)
 - [Testnet validation status](docs/testnet-validation.md)
 - [Repository audit](docs/repository-audit.md)
+- [Vercel deployment](docs/vercel-deployment.md)
 
 ## Use
 
-MVP; no hosted deployment. Testnet only. Do not use with Mainnet funds.
+MVP; the static build is ready for Vercel, but no hosted deployment has been performed. Testnet only. Do not use with Mainnet funds.

@@ -25,6 +25,7 @@ None. No existing source, UI components, tests, scripts, or git history was foun
 - Initial history was published in three commits (application, tests, documentation), followed by a documentation polish commit.
 - `.gitignore` excludes `node_modules/`, `dist/`, Playwright output, environment files, private keys, certificates, and logs.
 - No wallet secrets, credentials, build output, or test artifacts are committed.
+- Vercel deployment configuration (`vercel.json`) and a deployment guide (`docs/vercel-deployment.md`) are present. The app is a static Vite SPA with no environment variables or server runtime.
 - No deployment, hosted build, or real fund movement occurred.
 
 ## References consulted
