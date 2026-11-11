@@ -14,7 +14,6 @@ import { RecipientDetails } from './screens/RecipientDetails';
 import { Activity } from './screens/Activity';
 import { Settings } from './screens/Settings';
 import { NotFound } from './screens/NotFound';
-import type { Nettype } from '@certora/core';
 
 function AppBody() {
   const {
@@ -25,7 +24,7 @@ function AppBody() {
     error,
     clearError,
   } = useWallet();
-  const { setAccount } = useCertora();
+  const { setAccount, addActivity } = useCertora();
 
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -42,13 +41,64 @@ function AppBody() {
     }
   }, [connect]);
 
+  // The provider validates the network itself. Passing the raw wallet value
+  // means an unknown or Mainnet network clears the active partition instead of
+  // being silently coerced to Testnet.
   React.useEffect(() => {
-    if (connected && connection) {
-      setAccount(address as string, (connection.network as Nettype) ?? 'testnet');
-    } else if (!connected) {
-      setAccount(null, null);
+    if (connected && address) {
+      void setAccount(address, network);
+    } else {
+      void setAccount(null, null);
     }
-  }, [connected, connection, address, setAccount]);
+  }, [connected, address, network, setAccount]);
+
+  // Emit wallet lifecycle events exactly once per real transition.
+  const previousWalletRef = React.useRef<{
+    address: string | null;
+    network: string | null;
+    connected: boolean;
+  } | null>(null);
+
+  React.useEffect(() => {
+    const previous = previousWalletRef.current;
+    const current = {
+      address,
+      network,
+      connected: connected && !!address,
+    };
+
+    if (previous) {
+      if (current.connected && !previous.connected) {
+        addActivity({
+          type: 'wallet_connected',
+          account: address ?? undefined,
+          metadata: { network },
+        });
+      } else if (!current.connected && previous.connected) {
+        addActivity({
+          type: 'wallet_disconnected',
+          account: previous.address ?? undefined,
+        });
+      } else if (current.connected) {
+        if (previous.address !== current.address) {
+          addActivity({
+            type: 'account_changed',
+            account: address ?? undefined,
+            metadata: { previousAccount: previous.address },
+          });
+        }
+        if (previous.network !== current.network) {
+          addActivity({
+            type: 'network_changed',
+            account: address ?? undefined,
+            metadata: { previousNetwork: previous.network, network: current.network },
+          });
+        }
+      }
+    }
+
+    previousWalletRef.current = current;
+  }, [address, network, connected, addActivity]);
 
   return (
     <div className="relative min-h-screen">

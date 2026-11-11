@@ -1,5 +1,3 @@
-import * as React from 'react';
-
 interface IdenticonProps {
   value: string;
   size?: number;

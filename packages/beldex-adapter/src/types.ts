@@ -1,6 +1,8 @@
+import type { WalletNetwork } from '@certora/core';
+
 export interface WalletConnection {
   address: string;
-  network: string;
+  network: WalletNetwork;
   connected: boolean;
 }
 
@@ -9,4 +11,3 @@ export interface AdapterError {
   message: string;
   retryable: boolean;
 }
-

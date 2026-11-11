@@ -80,6 +80,34 @@ describe('evaluateStatus', () => {
     const mixedCasePin = { ...pin, destination: 'RecipientA' };
     expect(evaluateStatus(resolution('recipientA'), mixedCasePin)).toBe('DESTINATION_CHANGED');
   });
+
+  it('returns IDENTITY_MISMATCH when the name differs', () => {
+    expect(
+      evaluateStatus({ ...resolution('recipientA'), name: 'someone-else.bdx' }, pin),
+    ).toBe('IDENTITY_MISMATCH');
+  });
+
+  it('returns IDENTITY_MISMATCH when the mapping type differs', () => {
+    expect(
+      evaluateStatus(
+        { ...resolution('recipientA'), mappingType: 'other' as 'wallet' },
+        pin,
+      ),
+    ).toBe('IDENTITY_MISMATCH');
+  });
+
+  it('returns IDENTITY_MISMATCH when the fingerprint does not match', () => {
+    expect(evaluateStatus(resolution('recipientA'), pin, false)).toBe('IDENTITY_MISMATCH');
+  });
+
+  it('treats names case-insensitively for identity', () => {
+    const mixedNamePin = { ...pin, name: 'Merchant.BDX' };
+    expect(evaluateStatus(resolution('recipientA'), mixedNamePin)).toBe('MATCHES_PIN');
+  });
+
+  it('lets a destination change take precedence over a fingerprint mismatch', () => {
+    expect(evaluateStatus(resolution('recipientB'), pin, false)).toBe('DESTINATION_CHANGED');
+  });
 });
 
 describe('compareResolutionToPin', () => {
@@ -87,6 +115,7 @@ describe('compareResolutionToPin', () => {
     const pin = await matchingPin('recipientA');
     const result = await compareResolutionToPin(resolution('recipientA'), pin);
     expect(result.status).toBe('MATCHES_PIN');
+    expect(result.identityMatches).toBe(true);
     expect(result.fingerprintMatch).toBe(true);
   });
 
@@ -94,7 +123,28 @@ describe('compareResolutionToPin', () => {
     const pin = await matchingPin('recipientA');
     const result = await compareResolutionToPin(resolution('recipientB'), pin);
     expect(result.status).toBe('DESTINATION_CHANGED');
+    expect(result.identityMatches).toBe(true);
     expect(result.fingerprintMatch).toBe(false);
+  });
+
+  it('flags a tampered fingerprint even when the destination is unchanged', async () => {
+    const pin = await matchingPin('recipientA');
+    const result = await compareResolutionToPin(resolution('recipientA'), {
+      ...pin,
+      fingerprint: 'tampered',
+    });
+    expect(result.status).toBe('IDENTITY_MISMATCH');
+    expect(result.fingerprintMatch).toBe(false);
+  });
+
+  it('flags a different resolved name as an identity mismatch', async () => {
+    const pin = await matchingPin('recipientA');
+    const result = await compareResolutionToPin(
+      { ...resolution('recipientA'), name: 'other.bdx' },
+      pin,
+    );
+    expect(result.status).toBe('IDENTITY_MISMATCH');
+    expect(result.identityMatches).toBe(false);
   });
 
   it('preserves the original pin (no mutation)', async () => {

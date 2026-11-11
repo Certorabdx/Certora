@@ -11,37 +11,49 @@ No BNS registration, initial mapping, mapping update, transaction hash, explorer
 | Area | Method | Result |
 |------|--------|--------|
 | Core fingerprinting | Vitest unit tests | 3/3 pass |
-| Comparison/status engine | Vitest unit tests | 9/9 pass |
-| IndexedDB recipient store | Vitest + fake-indexeddb | 7/7 pass |
-| BNS input validation | Vitest unit tests | 8/8 pass |
+| Comparison/status engine | Vitest unit tests | 16/16 pass |
+| IndexedDB recipient store | Vitest + fake-indexeddb | 10/10 pass |
+| Safety policies | Vitest unit tests | 4/4 pass |
+| Wallet adapter events/state | Vitest unit tests | 10/10 pass |
+| BNS input validation and resolver safety | Vitest unit tests | 17/17 pass |
 | TypeScript | `tsc --noEmit` | Pass |
 | ESLint | `eslint src packages tests` | Pass, 0 warnings |
 | Production build | `vite build` | Pass |
-| UI workflow with a mocked provider | Playwright E2E | 3/3 pass |
-| Browser console (mocked run) | Manual inspection | Only React Router v7 future-flag warnings; no runtime errors |
+| UI workflow with a mocked provider | Playwright E2E | 8/8 pass |
+| Browser console (mocked run) | Manual inspection | No runtime errors observed |
 | Live Beldex Testnet connection | Official extension, real Testnet account | **Partial — see §3** |
 | Read-only Testnet dry run | Official extension, no funds | **Pass — 8 validation cases + 7 fresh negative lookups (see §3.1)** |
 | Full live BNS change-detection flow | Real name + mapping update | **Not performed** |
 
-Total automated tests: **27 unit tests + 3 mocked E2E tests**, all passing at the time of this report.
+Total automated tests: **60 unit tests + 8 mocked E2E tests**, all passing after the 2026-11-11 code-quality fixes. These counts verify application logic and mocked UI wiring only; they are not Testnet evidence.
 
 ## 2. E2E scenarios that passed (mocked wallet only)
 
 These tests use the development-only fake provider enabled by `?mock=1`. They prove UI wiring and state transitions. **They do not prove that the Beldex SDK, a real wallet, or the BNS resolver work on Testnet.**
 
-1. **Connect → resolve → pin → list**
-   - Mock provider reports Testnet and `BDXMockAddress123`.
-   - Resolves `merchant.bdx` → `BDXRecipientA`.
+1. **Connect → resolve → pin → list → reload persistence**
+   - Mock provider reports Testnet and a Testnet-shaped 95-character address.
+   - Resolves `merchant.bdx` to a Testnet-shaped destination.
    - Explicit pin confirmation writes the pin.
-   - Protected Recipients lists the pinned name.
+   - Protected Recipients lists the pinned name, and the pin survives a real document reload.
 2. **Destination change detection and reapproval**
-   - Pins `bob.bdx` → `BDXRecipientA`.
-   - Mock resolution changes to `BDXRecipientB`.
-   - Recheck performs a fresh resolution and shows `DESTINATION_CHANGED`.
-   - Old pin remains `BDXRecipientA`; both addresses are displayed.
+   - Pins `bob.bdx` to address A.
+   - The mock resolution changes to address B.
+   - A recheck performs a fresh resolution and shows `DESTINATION_CHANGED`.
+   - The old pin remains address A; both addresses are displayed.
    - Explicit reapproval updates the pin in place.
    - A subsequent recheck returns `MATCHES_PIN`.
-3. **Testnet indicator**
+3. **Input change invalidates a previous resolution**
+   - Editing the name clears the old receipt and removes the pin control before a new resolve.
+4. **Wallet network change to Mainnet blocks operations**
+   - The UI shows `Mainnet — rejected`, removes the resolve control, and restores the form when the wallet returns to Testnet without coercion.
+5. **Account switch isolates and restores pins**
+   - Pins are partitioned by wallet account; switching to another account shows the empty state and switching back restores the original pin.
+6. **Failed recheck preserves the approved pin**
+   - A rejected resolution shows `RESOLUTION_UNAVAILABLE` and leaves the approved destination visible.
+7. **Recheck state does not leak between records**
+   - A change result for recipient A does not appear on recipient B after in-app navigation.
+8. **Testnet indicator**
    - A Testnet indicator is visible in the shell.
 
 Evidence for these tests is reproducible with `npx playwright test --reporter=line`. It is **mock evidence**, not Testnet evidence.
@@ -98,7 +110,7 @@ The daemon was re-read during this run at height **4,342,130**: `nettype: "testn
 
 This dry run proves real Testnet wallet traffic, validation behavior, fresh-call behavior, failure handling, and the no-pin-on-failure guarantee. It does **not** prove a positive resolution, pin creation, change detection, or reapproval.
 
-A validation bug was found and fixed during this run: uppercase input such as `Merchant.BDX` previously produced the misleading message “BNS names must end with .bdx”. The suffix check is now case-insensitive, and uppercase input is rejected with “Use only lowercase letters, numbers, and hyphens.” A regression test was added; the suite is now **27/27**.
+A validation bug was found and fixed during this run: uppercase input such as `Merchant.BDX` previously produced the misleading message “BNS names must end with .bdx”. The suffix check is now case-insensitive, and uppercase input is rejected with “Use only lowercase letters, numbers, and hyphens.” A regression test was added.
 
 ## 4. Why full validation was not performed
 

@@ -50,6 +50,7 @@ const statusPill: Record<
   DESTINATION_CHANGED: { label: 'Changed', tone: 'warning' },
   RESOLUTION_UNAVAILABLE: { label: 'Unavailable', tone: 'critical' },
   NETWORK_MISMATCH: { label: 'Network mismatch', tone: 'warning' },
+  IDENTITY_MISMATCH: { label: 'Identity mismatch', tone: 'critical' },
   INVALID_NAME: { label: 'Invalid name', tone: 'critical' },
 };
 

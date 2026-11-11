@@ -1,11 +1,17 @@
 import { checkAddress, isValidAddressShape } from '@bdxi/web3js';
 import type { ResolveBnsResult } from '@bdxi/web3js';
-import type { BnsResolution, Nettype } from '@certora/core';
+import {
+  isSupportedNetwork,
+  requireTestnet,
+  type BnsResolution,
+  type Nettype,
+} from '@certora/core';
 
 /** Minimal structural interface for anything that can resolve a BNS name.
  *  Satisfied by BeldexWeb3 and by test mocks. */
 type ResolverLike = {
   resolveBns(name: string): Promise<ResolveBnsResult>;
+  getNetwork(): Promise<{ nettype: string }>;
 };
 
 /**
@@ -72,6 +78,11 @@ export function validateBnsName(name: string): BnsNameValidation {
 /**
  * Resolve a BNS name through the Beldex Wallet and return a structured result.
  * Bypasses any application-level cache by performing a fresh provider call.
+ *
+ * The provider network is checked before and after the resolution. A wallet
+ * that is not on Testnet, changes network mid-resolution, returns a different
+ * name, or returns a non-Testnet address shape produces an error instead of a
+ * resolution object. Nothing is ever auto-approved from this result.
  */
 export async function resolveBns(
   web3: ResolverLike,
@@ -83,38 +94,84 @@ export async function resolveBns(
     throw new Error(validation.reason || 'Invalid BNS name.');
   }
 
+  if (!requireTestnet(network)) {
+    throw new Error('Certora only resolves BNS names on Beldex Testnet.');
+  }
+
+  const requestedName = trimmedName(name);
   const start = Date.now();
+
+  await requireProviderTestnet(web3);
 
   let result: { name: string; address: string; verified: boolean };
   try {
-    result = await web3.resolveBns(trimmedName(name));
+    result = await web3.resolveBns(requestedName);
   } catch (err) {
     throw new Error(`BNS resolution failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
+  // The network may have changed while the resolver was in flight. Refuse to
+  // return a result from a wallet that is no longer on Testnet.
+  await requireProviderTestnet(web3);
+
   const durationMs = Date.now() - start;
 
-  if (!result.address) {
+  if (!result || typeof result.address !== 'string' || !result.address) {
     throw new Error('Resolver returned no destination for this name.');
   }
 
-  // Confirm the resolved destination is a testnet-shaped address.
+  if (typeof result.name !== 'string' || !result.name) {
+    throw new Error('Resolver returned a destination without a name.');
+  }
+
+  if (trimmedName(result.name) !== requestedName) {
+    throw new Error(
+      `Resolver returned a different name (${result.name}) than the one requested (${requestedName}).`,
+    );
+  }
+
   const addressCheck = checkAddress(result.address, 'testnet');
   if (!addressCheck.valid) {
-    // Still return the resolution but flag it; the UI should warn.
-    // We do not throw here because the resolver may return an integrated address
-    // or the wallet's resolver may use a format we should still display.
+    throw new Error(
+      `Resolver returned an invalid Testnet destination: ${addressCheck.reason ?? 'unknown reason'}.`,
+    );
   }
 
   return {
-    name: result.name,
+    name: requestedName,
     destination: result.address,
     network,
     mappingType: 'wallet',
-    verified: result.verified === true,
+    // The wallet's resolver is an evidence source, not an on-chain proof.
+    // Never upgrade this to true based on a wallet-provided flag.
+    verified: false,
     resolvedAt: Date.now(),
     durationMs,
   };
+}
+
+/**
+ * Read the provider network and require Testnet. A failed read is treated as
+ * uncertain and blocks resolution.
+ */
+async function requireProviderTestnet(web3: ResolverLike): Promise<void> {
+  let nettype: unknown;
+
+  try {
+    const network = await web3.getNetwork();
+    nettype = network?.nettype;
+  } catch {
+    throw new Error(
+      'Could not confirm the wallet network. Unlock the wallet and try again.',
+    );
+  }
+
+  if (!isSupportedNetwork(nettype)) {
+    const label = typeof nettype === 'string' && nettype ? nettype : 'unknown';
+    throw new Error(
+      `Wallet network is ${label}. Certora requires Beldex Testnet and will not switch networks.`,
+    );
+  }
 }
 
 /** Normalize the name (trim + lowercase per Beldex case-insensitivity). */

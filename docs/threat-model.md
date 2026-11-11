@@ -43,7 +43,7 @@ Certora does **not** hold private keys, seed phrases, signing capability, or fun
 - The full destination is displayed before approval; the user must explicitly approve it.
 - The pin comparison is exact and case-preserving.
 
-**Residual risk:** A compromised resolver or wallet can return a wrong address that the user approves. Certora cannot detect this without independent on-chain verification, which the SDK does not provide. The resolved address is passed through the SDK's `checkAddress(..., 'testnet')`, but that check is currently informational: a failed shape check does not block display or pinning.
+**Residual risk:** A compromised resolver or wallet can return a wrong address that the user approves. Certora cannot detect this without independent on-chain verification, which the SDK does not provide. The resolved address must pass the SDK's `checkAddress(..., 'testnet')` and the provider must report Testnet before and after resolution; a failure blocks the result. An address with a valid Testnet shape can still be attacker-controlled.
 
 ### T2. Silent destination change after approval
 

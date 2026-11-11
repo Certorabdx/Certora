@@ -15,7 +15,9 @@ Core guarantees:
 - **No automatic pin replacement.** A changed destination is only stored after an explicit approval dialog.
 - **Fresh resolution on every recheck.** Cached resolution results are never reused for change detection.
 - **Failed resolution preserves the pin.** A failed or uncertain lookup yields `RESOLUTION_UNAVAILABLE`; the approved pin is untouched.
-- **Testnet only.** Mainnet is blocked for resolution, pinning, and rechecks; Certora never switches networks.
+- **Identity-aware comparison.** A pin matches only when the name (case-insensitive), mapping type, network, exact destination, and fingerprint all agree. Name or fingerprint differences surface as `IDENTITY_MISMATCH` rather than an invitation to overwrite the record.
+- **One pin per name.** The store rejects a second pin for the same wallet account, network, and name inside the same IndexedDB transaction.
+- **Testnet only.** Mainnet and unrecognized networks are rejected at the adapter, provider, and storage boundaries. The raw wallet network is never coerced to Testnet, and Certora never switches networks.
 - **Honest verification.** The SDK returns `verified: false`; Certora displays this limitation instead of claiming on-chain verification.
 - **No payments, no secrets.** Certora never signs or sends transactions and never requests seed phrases or private keys.
 
@@ -59,9 +61,10 @@ Current verification:
 |-------|--------|
 | TypeScript | Pass |
 | ESLint | Pass (0 warnings) |
-| Unit tests | 27/27 pass |
-| E2E tests | 3/3 pass (mocked provider only) |
+| Unit tests | 60/60 pass (6 files) |
+| E2E tests | 8/8 pass (mocked provider only) |
 | Production build | Pass |
+| Production dependency audit | `npm audit --omit=dev`: 0 high/critical; 2 moderate React Router 6.x advisories whose fixes require a v7 major upgrade |
 | Real Testnet connection + read-only dry run | Pass — 8/8 validation, 7/7 fresh negative lookups, 0 pins |
 | Full Testnet change-detection cycle | **Not performed** — see blockers above |
 
@@ -70,6 +73,7 @@ Current verification:
 Appending `?mock=1` in a development build installs a fake wallet provider so UI flows can be exercised without the extension. This mode:
 
 - is disabled outside `import.meta.env.DEV`;
+- is fixed when the page loads, so in-app navigation cannot enable or disable it mid-session;
 - is exposed on `window.__mockWallet` only for Playwright;
 - **is not live testnet evidence** and must never be presented as such.
 
@@ -106,10 +110,10 @@ docs/                Research, architecture, threat model, runbooks, validation 
 
 1. Resolve a BNS name through the connected Beldex Wallet on Testnet.
 2. Review the full destination and the resolver-trust disclosure.
-3. Approve and pin: Certora stores a SHA-256 fingerprint and the exact destination in IndexedDB, partitioned by wallet account and network.
+3. Approve and pin: Certora stores a SHA-256 fingerprint and the exact destination in IndexedDB, partitioned by wallet account and network. Duplicate pins for the same account, network, and name are rejected transactionally.
 4. Later, open the recipient and choose **Recheck destination**. Certora performs a fresh resolution (no cached result).
-5. If the destination matches, the pin is unchanged. If it changed, both the approved and current destinations are displayed, and the original pin remains intact.
-6. Approving the new destination is a separate, explicit action. Only then is the pin updated.
+5. If the identity, network, destination, and fingerprint match, the pin is unchanged. If the destination changed, both the approved and current destinations are displayed, and the original pin remains intact. If the name, mapping type, network, or fingerprint differs, the result is shown as a mismatch and the pin is preserved.
+6. Approving a changed destination is a separate, explicit action. Only then is the existing pin updated; a reapproval can never change the pinned name or mapping type.
 
 Fingerprint input: `certora-v1` + network + name + mapping type + exact destination (case-preserving).
 

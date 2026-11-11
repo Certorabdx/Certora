@@ -25,9 +25,12 @@ import { StatusPill } from '../components/ui/StatusPill';
 import { Identicon } from '../components/ui/Identicon';
 import { useToast } from '../components/ui/Toast';
 import { formatDateTime } from '../lib/format';
+import { validateBnsName } from '@certora/beldex-adapter';
 import {
+  FINGERPRINT_VERSION,
   generateFingerprint,
   compareResolutionToPin,
+  isSupportedNetwork,
   type RecipientStatus,
 } from '@certora/core';
 
@@ -71,6 +74,12 @@ const statusLabel: Record<RecipientStatus, StatusConfig> = {
     tone: 'warning',
     icon: ShieldAlert,
   },
+  IDENTITY_MISMATCH: {
+    text: 'Identity mismatch',
+    pill: 'Identity mismatch',
+    tone: 'critical',
+    icon: ShieldAlert,
+  },
   INVALID_NAME: {
     text: 'Invalid name',
     pill: 'Invalid name',
@@ -93,21 +102,56 @@ export function RecipientDetails() {
   } = useCertora();
   const { add, clear: clearToasts } = useToast();
 
-  const { resolution, loading: resolving, resolve, error: resolveError } = useResolver(web3);
+  const {
+    resolution,
+    loading: resolving,
+    resolve,
+    error: resolveError,
+    clear: clearResolution,
+  } = useResolver(web3);
 
   const connected = connection?.connected ?? false;
-  const isTestnet = connection?.network === 'testnet';
+  const isTestnet = isSupportedNetwork(connection?.network);
   const network = connection?.network ?? null;
   const account = connection?.address ?? null;
 
   const pin = React.useMemo(() => recipients.find((p) => p.id === id), [recipients, id]);
   const [recheckStatus, setRecheckStatus] = React.useState<RecipientStatus | null>(null);
   const [reapproveDialog, setReapproveDialog] = React.useState<{
+    pinId: string;
     oldDestination: string;
     newDestination: string;
   } | null>(null);
   const [removeDialog, setRemoveDialog] = React.useState(false);
   const [removing, setRemoving] = React.useState(false);
+
+  // Guards against a recheck from recipient A landing after the user has
+  // navigated to recipient B or after the wallet session changed.
+  const recheckSeqRef = React.useRef(0);
+  const idRef = React.useRef(id);
+  const walletRef = React.useRef({ account, network });
+  idRef.current = id;
+  walletRef.current = { account, network };
+
+  React.useEffect(() => {
+    recheckSeqRef.current += 1;
+    setRecheckStatus(null);
+    setReapproveDialog(null);
+    setRemoveDialog(false);
+    clearResolution();
+  }, [id, clearResolution]);
+
+  React.useEffect(() => {
+    recheckSeqRef.current += 1;
+    setRecheckStatus(null);
+    setReapproveDialog(null);
+    clearResolution();
+  }, [account, network, clearResolution]);
+
+  const currentResolution =
+    resolution && pin && resolution.name.trim().toLowerCase() === pin.name.trim().toLowerCase()
+      ? resolution
+      : null;
 
   const handleRemove = async () => {
     if (!pin) return;
@@ -128,15 +172,48 @@ export function RecipientDetails() {
   };
 
   const handleRecheck = async () => {
-    if (!pin || !connected || !isTestnet || !account || !network) return;
+    if (!pin || !connected || !isTestnet || !account || network !== 'testnet') return;
+
+    const validation = validateBnsName(pin.name);
+    if (!validation.valid) {
+      setRecheckStatus('INVALID_NAME');
+      addActivity({
+        type: 'resolution_failed',
+        name: pin.name,
+        metadata: { reason: validation.reason },
+      });
+      add({
+        type: 'error',
+        title: 'Invalid stored name',
+        description: validation.reason ?? 'The saved name is not a valid BNS name.',
+      });
+      return;
+    }
+
     clearToasts();
     setRecheckStatus(null);
+    setReapproveDialog(null);
+
+    const targetPin = pin;
+    const seq = ++recheckSeqRef.current;
+    const walletAtStart = { account, network };
+
     try {
-      const result = await resolve(pin.name, 'testnet');
+      const result = await resolve(targetPin.name, 'testnet');
+      if (seq !== recheckSeqRef.current || idRef.current !== targetPin.id) return;
+
+      const walletNow = walletRef.current;
+      if (
+        walletNow.account !== walletAtStart.account ||
+        walletNow.network !== walletAtStart.network
+      ) {
+        return;
+      }
+
       if (!result) {
         // A failed or unavailable resolution must never alter the pin.
         setRecheckStatus('RESOLUTION_UNAVAILABLE');
-        addActivity({ type: 'resolution_failed', name: pin.name });
+        addActivity({ type: 'resolution_failed', name: targetPin.name });
         add({
           type: 'error',
           title: 'Recheck failed',
@@ -145,9 +222,11 @@ export function RecipientDetails() {
         return;
       }
 
-      const comparison = await compareResolutionToPin(result, pin);
+      const comparison = await compareResolutionToPin(result, targetPin);
+      if (seq !== recheckSeqRef.current || idRef.current !== targetPin.id) return;
+
       setRecheckStatus(comparison.status);
-      await touchRecipient(pin.id);
+      await touchRecipient(targetPin.id);
 
       addActivity({
         type: 'recipient_rechecked',
@@ -157,10 +236,17 @@ export function RecipientDetails() {
       });
 
       if (comparison.status === 'DESTINATION_CHANGED') {
+        addActivity({
+          type: 'destination_changed',
+          name: result.name,
+          previousDestination: targetPin.destination,
+          newDestination: result.destination,
+          status: comparison.status,
+        });
         add({
           type: 'warning',
           title: 'Destination changed',
-          description: `${pin.name} now resolves to a different address.`,
+          description: `${targetPin.name} now resolves to a different address.`,
         });
       } else if (comparison.status === 'MATCHES_PIN') {
         add({
@@ -168,8 +254,19 @@ export function RecipientDetails() {
           title: 'Destination unchanged',
           description: 'Matches your approved recipient.',
         });
+      } else if (
+        comparison.status === 'IDENTITY_MISMATCH' ||
+        comparison.status === 'NETWORK_MISMATCH'
+      ) {
+        add({
+          type: 'error',
+          title: 'Record mismatch',
+          description:
+            'The fresh resolution does not match this record’s identity or network. The pin is unchanged.',
+        });
       }
     } catch (err) {
+      if (seq !== recheckSeqRef.current || idRef.current !== targetPin.id) return;
       setRecheckStatus('RESOLUTION_UNAVAILABLE');
       add({
         type: 'error',
@@ -178,25 +275,40 @@ export function RecipientDetails() {
       });
       addActivity({
         type: 'resolution_failed',
-        name: pin.name,
+        name: targetPin.name,
       });
     }
   };
 
   const handleReapprove = async () => {
-    if (!pin || !reapproveDialog || !account || !network) return;
+    if (!pin || !reapproveDialog || !account || network !== 'testnet') return;
+
+    if (
+      reapproveDialog.pinId !== pin.id ||
+      reapproveDialog.oldDestination !== pin.destination
+    ) {
+      setReapproveDialog(null);
+      add({
+        type: 'error',
+        title: 'Approval cancelled',
+        description: 'The pinned record changed. Recheck it again before approving.',
+      });
+      return;
+    }
+
     clearToasts();
+    const targetPin = pin;
     try {
       const fingerprint = await generateFingerprint({
-        version: 'certora-v1',
-        network: network as 'testnet',
-        name: pin.name,
-        mappingType: pin.mappingType,
+        version: FINGERPRINT_VERSION,
+        network: targetPin.network,
+        name: targetPin.name,
+        mappingType: targetPin.mappingType,
         destination: reapproveDialog.newDestination,
       });
-      await updateRecipient(pin.id, {
-        name: pin.name,
-        mappingType: pin.mappingType,
+      await updateRecipient(targetPin.id, {
+        name: targetPin.name,
+        mappingType: targetPin.mappingType,
         destination: reapproveDialog.newDestination,
         fingerprint,
         approvedAt: Date.now(),
@@ -204,7 +316,7 @@ export function RecipientDetails() {
       });
       addActivity({
         type: 'destination_approved',
-        name: pin.name,
+        name: targetPin.name,
         previousDestination: reapproveDialog.oldDestination,
         newDestination: reapproveDialog.newDestination,
       });
@@ -429,15 +541,17 @@ export function RecipientDetails() {
                       : recheckStatus === 'RESOLUTION_UNAVAILABLE'
                         ? 'A fresh resolution could not be completed. Your approved pin is preserved.'
                         : recheckStatus === 'NETWORK_MISMATCH'
-                          ? 'The resolution was performed on a different network than this pin.'
-                          : recheckStatus === 'INVALID_NAME'
-                            ? 'The stored name is no longer considered valid by the BNS validator.'
-                            : 'Run a recheck to compare a fresh resolution against this record.'}
+                          ? 'The resolution was performed on a different network than this pin. The pin is unchanged.'
+                          : recheckStatus === 'IDENTITY_MISMATCH'
+                            ? 'The fresh resolution does not match the name, mapping type, or fingerprint in this record. The pin is unchanged.'
+                            : recheckStatus === 'INVALID_NAME'
+                              ? 'The stored name is no longer considered valid by the BNS validator.'
+                              : 'Run a recheck to compare a fresh resolution against this record.'}
                 </p>
               </div>
             </div>
 
-            {recheckStatus === 'DESTINATION_CHANGED' && resolution && (
+            {recheckStatus === 'DESTINATION_CHANGED' && currentResolution && (
               <div className="mt-5 space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-line bg-[#0B0E12] p-3.5">
@@ -453,7 +567,7 @@ export function RecipientDetails() {
                       Resolved now
                     </p>
                     <div className="mt-2">
-                      <Address address={resolution.destination} showCopy={false} size="sm" />
+                      <Address address={currentResolution.destination} showCopy={false} size="sm" />
                     </div>
                   </div>
                 </div>
@@ -469,8 +583,9 @@ export function RecipientDetails() {
                 <Button
                   onClick={() =>
                     setReapproveDialog({
+                      pinId: pin.id,
                       oldDestination: pin.destination,
-                      newDestination: resolution.destination,
+                      newDestination: currentResolution.destination,
                     })
                   }
                   disabled={!!reapproveDialog}

@@ -132,12 +132,16 @@ Certora — Beldex Testnet BNS Resolution and Recipient Protection MVP
 - [x] Real testnet validation documented (partial evidence documented; full cycle outstanding)
 
 ### H. Testing and quality
-- [x] Unit tests implemented
-- [x] Core comparison tests pass (9/9)
-- [x] Storage tests pass (7/7)
-- [ ] Wallet adapter unit tests (none written; resolver validation tests cover 8 cases)
+- [x] Unit tests implemented (60/60 across 6 files)
+- [x] Core comparison/status tests pass (16/16)
+- [x] Storage tests pass (10/10, including duplicate and non-Testnet rejection)
+- [x] Policy tests pass (4/4)
+- [x] Wallet adapter unit tests pass (10/10: events, lock/unlock, stale refresh, provider swap)
+- [x] Resolver tests pass (17/17: Testnet enforcement, name echo, address shape)
+- [x] Fingerprint tests pass (3/3)
 - [ ] Dedicated integration test suite (workflow covered by mocked E2E instead)
-- [x] End-to-end mock-provider tests pass (3/3)
+- [x] End-to-end mock-provider tests pass (8/8)
+- [x] Production dependency audit: 0 high/critical (`npm audit --omit=dev`); 2 moderate React Router 6.x advisories require a v7 major upgrade
 - [x] Real Testnet read-only dry run pass (8/8 validation, 7/7 negative lookups)
 - [ ] Full real testnet change-detection validation performed (partial only: live connection, validation matrix, negative BNS lookups)
 - [x] TypeScript checks pass

@@ -1,5 +1,19 @@
 export type Nettype = 'testnet';
 
+/**
+ * Network values a wallet can report. Certora only supports Testnet, but the
+ * wallet boundary must model the unsupported values explicitly rather than
+ * casting them into `Nettype`.
+ */
+export type WalletNetwork = 'testnet' | 'mainnet' | 'unknown';
+
+/** The only network on which Certora is allowed to resolve, pin, or recheck. */
+export const SUPPORTED_NETWORK: Nettype = 'testnet';
+
+export function isSupportedNetwork(network: unknown): network is Nettype {
+  return network === SUPPORTED_NETWORK;
+}
+
 export type MappingType = 'wallet';
 
 export interface BnsResolution {
@@ -30,6 +44,7 @@ export type RecipientStatus =
   | 'DESTINATION_CHANGED'
   | 'RESOLUTION_UNAVAILABLE'
   | 'NETWORK_MISMATCH'
+  | 'IDENTITY_MISMATCH'
   | 'INVALID_NAME';
 
 export interface ResolutionError {

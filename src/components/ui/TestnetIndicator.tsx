@@ -8,16 +8,24 @@ interface TestnetIndicatorProps {
 
 export function TestnetIndicator({ network, connected, className }: TestnetIndicatorProps) {
   const isTestnet = network === 'testnet';
-  const rejected = connected && !!network && !isTestnet;
+  // A connected wallet whose network is missing or unrecognized is just as
+  // unsupported as Mainnet. Never render it as a Testnet badge.
+  const rejected = connected && !isTestnet;
+  const rejectionLabel =
+    network === 'mainnet'
+      ? 'Mainnet — rejected'
+      : network
+        ? `Unsupported: ${network}`
+        : 'Network unverified';
 
   if (rejected) {
     return (
       <div
         className={`inline-flex items-center gap-1.5 rounded-full border border-critical/30 bg-critical/[0.08] px-2.5 py-1.5 text-[11px] font-medium text-critical ${className ?? ''}`}
-        title={`Connected network: ${network}`}
+        title={`Connected network: ${network ?? 'unknown'}`}
       >
         <ShieldAlert className="h-3.5 w-3.5" />
-        <span>Mainnet — rejected</span>
+        <span>{rejectionLabel}</span>
       </div>
     );
   }

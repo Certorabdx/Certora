@@ -55,7 +55,7 @@ export function Resolve() {
     detecting,
     connecting,
   } = useWallet();
-  const { addRecipient, recipients, account, network } = useCertora();
+  const { addRecipient, addActivity, recipients, account, network } = useCertora();
   const { add } = useToast();
   const navigate = useNavigate();
 
@@ -77,13 +77,48 @@ export function Resolve() {
   }, [name]);
 
   const connected = connection?.connected ?? false;
+  const walletAddress = connection?.address ?? null;
+  const walletNetwork = connection?.network ?? null;
+
+  // A resolution belongs to the exact input and wallet session that produced
+  // it. Changing either one invalidates it so a stale address can never be
+  // pinned under a different name or account.
+  React.useEffect(() => {
+    if (resolution && resolution.name !== name.trim().toLowerCase()) {
+      clear();
+    }
+  }, [name, resolution, clear]);
+
+  React.useEffect(() => {
+    clear();
+  }, [walletAddress, walletNetwork, clear]);
+
+  React.useEffect(() => {
+    if (
+      pinDialog &&
+      (!resolution ||
+        pinDialog.name !== resolution.name ||
+        pinDialog.destination !== resolution.destination ||
+        resolution.name !== name.trim().toLowerCase())
+    ) {
+      setPinDialog(null);
+    }
+  }, [pinDialog, resolution, name]);
+
   const existing = recipients.find(
     (r) => r.name.toLowerCase() === name.trim().toLowerCase() && r.network === network,
   );
 
   const handleResolve = async () => {
     if (!connected || !isTestnet) return;
-    await resolve(name, 'testnet');
+    const result = await resolve(name, 'testnet');
+    if (result) {
+      addActivity({
+        type: 'name_resolved',
+        name: result.name,
+        destination: result.destination,
+      });
+    }
   };
 
   const handleConnect = async () => {
@@ -95,7 +130,26 @@ export function Resolve() {
   };
 
   const handlePin = async () => {
-    if (!resolution || !account || !network || !pinDialog) return;
+    if (!resolution || !account || network !== 'testnet' || !pinDialog) return;
+
+    // The approval must refer to the resolution currently on screen and the
+    // exact input that produced it. Never pin a stale receipt.
+    const inputName = name.trim().toLowerCase();
+    if (
+      resolution.network !== 'testnet' ||
+      resolution.name !== inputName ||
+      pinDialog.name !== resolution.name ||
+      pinDialog.destination !== resolution.destination
+    ) {
+      setPinDialog(null);
+      add({
+        type: 'error',
+        title: 'Pin cancelled',
+        description: 'The name or resolution changed. Resolve the current name again.',
+      });
+      return;
+    }
+
     setPinning(true);
     try {
       const fingerprintInput = makeFingerprintInput({

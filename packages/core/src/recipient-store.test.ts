@@ -7,6 +7,7 @@ import {
   getPinById,
   getPinByName,
   resetDb,
+  updateLastChecked,
   validatePin,
   type RecipientPin,
 } from './recipient-store';
@@ -64,14 +65,40 @@ describe('recipient-store IndexedDB', () => {
     expect(acct2.length).toBe(1);
   });
 
-  it('partitions pins by network', async () => {
-    await savePin({ ...basePin, network: 'testnet', name: 'a.bdx' });
-    await savePin({ ...basePin, network: 'mainnet' as 'testnet', name: 'a.bdx' });
+  it('rejects a non-Testnet pin at the storage boundary', async () => {
+    await expect(
+      savePin({ ...basePin, network: 'mainnet' as 'testnet' }),
+    ).rejects.toThrow(/Testnet/);
+    await expect(getPins('acct-1', 'mainnet' as 'testnet')).rejects.toThrow(/Testnet/);
+    expect(validatePin({ ...basePin, id: 'pin-1', network: 'mainnet' })).toBe(false);
+  });
 
-    const testnet = await getPins('acct-1', 'testnet');
-    const mainnet = await getPins('acct-1', 'mainnet' as 'testnet');
-    expect(testnet.length).toBe(1);
-    expect(mainnet.length).toBe(1);
+  it('rejects a duplicate account + network + name (case-insensitive)', async () => {
+    await savePin({ ...basePin, name: 'merchant.bdx' });
+
+    await expect(
+      savePin({ ...basePin, name: 'Merchant.BDX', destination: 'recipientB' }),
+    ).rejects.toThrow(/already pinned/);
+
+    const pins = await getPins('acct-1', 'testnet');
+    expect(pins.length).toBe(1);
+    expect(pins[0].destination).toBe('recipientA');
+  });
+
+  it('allows updating the same pin id', async () => {
+    const saved = await savePin(basePin);
+    await savePin({ ...basePin, id: saved.id, destination: 'recipientB' });
+
+    const pins = await getPins('acct-1', 'testnet');
+    expect(pins.length).toBe(1);
+    expect(pins[0].destination).toBe('recipientB');
+  });
+
+  it('updates lastCheckedAt atomically', async () => {
+    const saved = await savePin({ ...basePin, lastCheckedAt: 1 });
+    await updateLastChecked(saved.id);
+    const fetched = await getPinById(saved.id);
+    expect(fetched!.lastCheckedAt).toBeGreaterThan(1);
   });
 
   it('finds pin by name (case-insensitive)', async () => {

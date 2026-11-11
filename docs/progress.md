@@ -130,7 +130,7 @@
 ## Phase 13 — Final documentation polish (2026-11-10)
 - Audited `README.md` and every file in `docs/` against the current code and recorded evidence.
 - Removed stale claims: non-existent `network.ts`, `PostMessageProvider` references, “no live Testnet validation”, “no Git history”, and obsolete test counts.
-- Corrected the architecture and resolution flow to match the code: the UI gates wallet/Testnet before calling the adapter, and the address shape check is informational and non-blocking.
+- Corrected the architecture and resolution flow to match the code at that time: the UI gated wallet/Testnet before calling the adapter, and the address shape check was informational and non-blocking. (Superseded in Phase 15: the adapter now enforces Testnet and the address shape at the resolver boundary.)
 - Updated the UI research document to the implemented warm near-black palette and Instrument Serif / Geist / Geist Mono typography.
 - Updated the implementation checklist, runbook status, repository audit, and validation report to the published-repository state.
 - Documentation-only change; no application code or behavior changed.
@@ -142,6 +142,27 @@
 - No Content-Security-Policy is set yet; it must be tested against the Beldex Wallet extension before enabling.
 - No deployment was performed. Importing the repository requires the owner's Vercel account.
 - Re-ran the production build and configuration validation after adding the deployment files.
+
+## Phase 15 — Code-quality and safety fixes (2026-11-11)
+Addressed the review findings at the core, adapter, provider, and screen layers. No new live Testnet evidence was produced.
+
+- **Testnet enforcement moved to the boundaries.** Added explicit `WalletNetwork = 'testnet' | 'mainnet' | 'unknown'`; the adapter never coerces unknown values to Testnet. The resolver requires Testnet before and after the provider call, rejects a different resolved name, and blocks non-Testnet-shaped destinations. The store rejects non-Testnet pins and lookups at runtime.
+- **Immutable wallet state and real event propagation.** `BeldexWalletAdapter` now publishes a new connection snapshot per transition, handles `accountsChanged`, `networkChanged`, `lock`, and `unlock`, guards a stale `refresh()` from overwriting newer events, unbinds a replaced provider, and keeps provider unbinders separate from UI subscribers.
+- **Account/load race handling.** `CertoraProvider` ignores stale partition loads, waits for readiness before mutations, re-checks the active account/network after awaits, rejects cross-account updates/removals, and records activity with an explicit account.
+- **Pin integrity.** The store rejects duplicate account + network + name pins inside one read/write transaction; clear/update/remove resolve only after commit; `validatePin` enforces the Testnet-only shape. Reapproval preserves pin id, name, and mapping type and verifies the old destination before writing.
+- **Identity-aware comparison.** `evaluateStatus` checks network, case-insensitive name and mapping type, exact destination, then fingerprint. Added `IDENTITY_MISMATCH`; the UI reports it without offering to overwrite the pin. Fingerprint version is enforced from one constant.
+- **Stale-result guards.** `useResolver` uses request generations and resets on wallet/input changes/unmount. Resolve closes a stale pin dialog and blocks stale approval; Recipient Details resets on route/account/network change and discards late recheck results.
+- **Root-caused the failing account-switch E2E test.** In-app navigation drops `?mock=1`; recomputing mock mode per render let the wallet effect tear down the mock mid-session when an account event re-rendered the provider. Mock mode is now fixed at module load.
+- **Dependencies.** Upgraded `react-router-dom` 6.28.0 → 6.30.6 (and `@remix-run/router` 1.23.4), resolving the three high-severity advisories. Two moderate React Router 6.x advisories remain; their fixes require a v7 major upgrade. One is SSR-hydration-only and the other requires user-controlled link targets; this client-only SPA uses static internal routes.
+- **Verification after the fixes:**
+  - `npm test` — **60/60 unit tests pass** across 6 files (comparison 16, resolver 17, store 10, wallet 10, policies 4, fingerprint 3).
+  - `npx playwright test --reporter=line` — **8/8 mocked E2E tests pass**.
+  - `npx tsc --noEmit --noUnusedLocals --noUnusedParameters` — pass.
+  - `npm run lint` — pass, 0 warnings.
+  - `npm run build` — pass.
+  - `npm audit --omit=dev` — 0 high/critical; 2 moderate.
+- Documentation updated to match: README guarantees/test counts/mock-mode behavior, architecture resolution/comparison/storage/wallet-state sections, threat-model residual risk, implementation checklist, and validation-report test inventory.
+- **Still not Testnet evidence.** No funded Testnet account, BNS registration, mapping update, transaction hash, explorer link, or detected change/reapproval cycle was obtained.
 
 ## Outstanding
 - **Full real Beldex Testnet BNS validation remains unperformed.** A live wallet connection, a read-only dry run, and real negative BNS lookups were obtained, but there is still no owner-controlled Testnet BNS name, funded balance, mapping update, transaction hash, explorer link, or detected change/reapproval cycle.

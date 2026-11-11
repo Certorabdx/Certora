@@ -1,4 +1,4 @@
-import type { RecipientPin, ActivityEvent, Nettype } from './types';
+import { isSupportedNetwork, type RecipientPin, type ActivityEvent, type Nettype } from './types';
 export type { RecipientPin };
 
 const DB_NAME = 'certora';
@@ -7,8 +7,20 @@ const STORE_NAME = 'recipientPins';
 
 type Db = IDBDatabase;
 
-let openRequest: IDBOpenDBRequest | null = null;
+let dbInstance: Db | null = null;
 let dbPromise: Promise<Db> | null = null;
+
+/**
+ * Reject any network that is not Certora's supported Testnet. This is a
+ * runtime guard at the storage boundary: the TypeScript types alone can be
+ * bypassed by casts, persisted data, or adapter bugs.
+ */
+export function assertSupportedNetwork(network: unknown): Nettype {
+  if (!isSupportedNetwork(network)) {
+    throw new Error('Certora only stores and compares recipients on Beldex Testnet.');
+  }
+  return network;
+}
 
 /**
  * Open (or create) the IndexedDB database with schema versioning.
@@ -20,10 +32,12 @@ function openDb(): Promise<Db> {
 
   dbPromise = new Promise((resolve, reject) => {
     const request = (indexedDB.open(DB_NAME, DB_VERSION) as unknown) as IDBOpenDBRequest;
-    openRequest = request;
 
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      dbInstance = request.result;
+      resolve(request.result);
+    };
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -45,14 +59,14 @@ function openDb(): Promise<Db> {
  * Used between tests and when the account changes.
  */
 export function resetDb(): void {
-  if (openRequest) {
+  if (dbInstance) {
     try {
-      openRequest.result?.close();
+      dbInstance.close();
     } catch {
       // Ignore close errors.
     }
-    openRequest = null;
   }
+  dbInstance = null;
   dbPromise = null;
 }
 
@@ -67,9 +81,22 @@ function uuid(): string {
 }
 
 /**
+ * Reject a transaction with a descriptive error, then abort it.
+ */
+function failTransaction(tx: IDBTransaction, failure: { error: Error | null }, error: Error): void {
+  failure.error ??= error;
+  try {
+    tx.abort();
+  } catch {
+    // The transaction may already be aborting; the onabort handler reports it.
+  }
+}
+
+/**
  * Get all pins for a given account + network partition.
  */
 export async function getPins(account: string, network: Nettype): Promise<RecipientPin[]> {
+  const supportedNetwork = assertSupportedNetwork(network);
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly');
@@ -79,7 +106,7 @@ export async function getPins(account: string, network: Nettype): Promise<Recipi
 
     request.onsuccess = () => {
       const all = request.result as RecipientPin[];
-      resolve(all.filter((p) => p.network === network));
+      resolve(all.filter((p) => p.network === supportedNetwork));
     };
     request.onerror = () => reject(request.error);
   });
@@ -94,7 +121,7 @@ export async function getPinById(id: string): Promise<RecipientPin | null> {
     const tx = db.transaction(STORE_NAME, 'readonly');
     const store = tx.objectStore(STORE_NAME);
     const request = store.get(id);
-    request.onsuccess = () => resolve(request.result as RecipientPin | null ?? null);
+    request.onsuccess = () => resolve((request.result as RecipientPin | undefined) ?? null);
     request.onerror = () => reject(request.error);
   });
 }
@@ -115,24 +142,86 @@ export async function getPinByName(
  * Save (create or replace explicitly) a recipient pin.
  * This is only called after explicit user approval — never automatically.
  * A UUID id is generated when the pin has none.
+ *
+ * The read/check/write sequence happens inside one readwrite transaction, so
+ * two concurrent approvals for the same account + network + name cannot both
+ * create a second pin.
  */
 export type RecipientPinInput = Omit<RecipientPin, 'id'> & { id?: string };
 
 export async function savePin(pin: RecipientPinInput): Promise<RecipientPin> {
-  const record = { ...pin, id: pin.id ?? uuid() };
+  const network = assertSupportedNetwork(pin.network);
+  const record: RecipientPin = {
+    ...pin,
+    id: pin.id ?? uuid(),
+    network,
+  };
+
+  if (!validatePin(record)) {
+    throw new Error('Refusing to save a pin with an invalid shape.');
+  }
+
   const db = await openDb();
   return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    const request = store.put(record);
+    const failure: { error: Error | null } = { error: null };
+    let saved: RecipientPin | null = null;
 
-    request.onsuccess = () => resolve(record);
-    request.onerror = () => reject(request.error);
+    tx.oncomplete = () => {
+      if (failure.error) {
+        reject(failure.error);
+      } else if (saved) {
+        resolve(saved);
+      } else {
+        reject(new Error('Pin transaction completed without saving a record.'));
+      }
+    };
+    tx.onerror = () => {
+      failure.error ??= tx.error ?? new Error('Failed to save the recipient pin.');
+    };
+    tx.onabort = () => {
+      reject(failure.error ?? tx.error ?? new Error('Saving the recipient pin was aborted.'));
+    };
+
+    const request = store.index('account').getAll(IDBKeyRange.only(record.account));
+    request.onerror = () => {
+      failTransaction(tx, failure, request.error ?? new Error('Failed to inspect existing pins.'));
+    };
+    request.onsuccess = () => {
+      const existing = request.result as RecipientPin[];
+      const normalizedName = record.name.trim().toLowerCase();
+      const duplicate = existing.find(
+        (p) =>
+          p.id !== record.id &&
+          p.network === record.network &&
+          p.name.trim().toLowerCase() === normalizedName,
+      );
+
+      if (duplicate) {
+        failTransaction(
+          tx,
+          failure,
+          new Error(
+            `A recipient named "${record.name}" is already pinned for this account and network.`,
+          ),
+        );
+        return;
+      }
+
+      const put = store.put(record);
+      put.onsuccess = () => {
+        saved = record;
+      };
+      put.onerror = () => {
+        failTransaction(tx, failure, put.error ?? new Error('Failed to write the recipient pin.'));
+      };
+    };
   });
 }
 
 /**
- * Remove a pin by id.
+ * Remove a pin by id. Resolves only after the transaction commits.
  */
 export async function removePin(id: string): Promise<void> {
   const db = await openDb();
@@ -140,30 +229,79 @@ export async function removePin(id: string): Promise<void> {
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
     const request = store.delete(id);
-
-    request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error ?? new Error('Failed to remove the recipient pin.'));
+    tx.onabort = () => reject(tx.error ?? new Error('Removing the recipient pin was aborted.'));
   });
 }
 
 /**
- * Clear all pins for a given account + network partition (deliberate data clearing).
+ * Clear all pins for a given account + network partition (deliberate data
+ * clearing). The lookup and deletes run in one transaction so a failed clear
+ * cannot leave a half-deleted partition behind.
  */
 export async function clearPins(account: string, network: Nettype): Promise<number> {
-  const pins = await getPins(account, network);
-  for (const pin of pins) {
-    await removePin(pin.id);
-  }
-  return pins.length;
+  const supportedNetwork = assertSupportedNetwork(network);
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    let count = 0;
+
+    tx.oncomplete = () => resolve(count);
+    tx.onerror = () => reject(tx.error ?? new Error('Failed to clear recipient pins.'));
+    tx.onabort = () => reject(tx.error ?? new Error('Clearing recipient pins was aborted.'));
+
+    const request = store.index('account').getAll(IDBKeyRange.only(account));
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const pins = (request.result as RecipientPin[]).filter(
+        (p) => p.network === supportedNetwork,
+      );
+      count = pins.length;
+      for (const pin of pins) {
+        store.delete(pin.id);
+      }
+    };
+  });
 }
 
 /**
- * Update the lastCheckedAt timestamp on a pin.
+ * Update the lastCheckedAt timestamp on a pin in a single transaction.
  */
 export async function updateLastChecked(id: string): Promise<void> {
-  const pin = await getPinById(id);
-  if (!pin) return;
-  await savePin({ ...pin, lastCheckedAt: Date.now() });
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const failure: { error: Error | null } = { error: null };
+
+    tx.oncomplete = () => {
+      if (failure.error) reject(failure.error);
+      else resolve();
+    };
+    tx.onerror = () => {
+      failure.error ??= tx.error ?? new Error('Failed to update the pin timestamp.');
+    };
+    tx.onabort = () => {
+      reject(failure.error ?? tx.error ?? new Error('Updating the pin timestamp was aborted.'));
+    };
+
+    const request = store.get(id);
+    request.onerror = () => {
+      failTransaction(tx, failure, request.error ?? new Error('Failed to read the recipient pin.'));
+    };
+    request.onsuccess = () => {
+      const pin = request.result as RecipientPin | undefined;
+      if (!pin) return;
+      if (!validatePin(pin)) {
+        failTransaction(tx, failure, new Error('Refusing to update an invalid recipient pin.'));
+        return;
+      }
+      store.put({ ...pin, lastCheckedAt: Date.now() });
+    };
+  });
 }
 
 /**
@@ -204,20 +342,27 @@ export function makeActivityEvent(input: {
 }
 
 /**
- * Validate a RecipientPin shape.
+ * Validate a RecipientPin shape, including the Testnet-only policy.
  */
 export function validatePin(pin: unknown): pin is RecipientPin {
   if (!pin || typeof pin !== 'object') return false;
   const p = pin as Record<string, unknown>;
   return (
     typeof p.id === 'string' &&
+    p.id.length > 0 &&
     typeof p.account === 'string' &&
-    (p.network === 'testnet' || p.network === 'mainnet') &&
+    p.account.length > 0 &&
+    isSupportedNetwork(p.network) &&
     typeof p.name === 'string' &&
-    typeof p.mappingType === 'string' &&
+    p.name.length > 0 &&
+    p.mappingType === 'wallet' &&
     typeof p.destination === 'string' &&
+    p.destination.length > 0 &&
     typeof p.fingerprint === 'string' &&
+    p.fingerprint.length > 0 &&
     typeof p.approvedAt === 'number' &&
-    typeof p.lastCheckedAt === 'number'
+    Number.isFinite(p.approvedAt) &&
+    typeof p.lastCheckedAt === 'number' &&
+    Number.isFinite(p.lastCheckedAt)
   );
 }

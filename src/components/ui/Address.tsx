@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { CopyButton } from './CopyButton';
 import { shortAddress } from '../../lib/format';
 

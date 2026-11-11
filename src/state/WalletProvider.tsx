@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { detectProvider } from '@bdxi/web3js';
 import { BeldexWalletAdapter, type WalletConnection } from '@certora/beldex-adapter';
+import { isSupportedNetwork } from '@certora/core';
 import { isMockMode, createMockWallet, type MockWeb3 } from '../mockWallet';
 
 type Web3 = ReturnType<BeldexWalletAdapter['getWeb3']> | MockWeb3 | null;
@@ -22,14 +23,19 @@ interface WalletContextValue {
 const WalletContext = React.createContext<WalletContextValue | null>(null);
 
 /**
+ * Mock mode is fixed for the lifetime of the page. Recomputing it on every
+ * render would let an in-app navigation (which drops the query string) swap
+ * the wallet backend from the mock to real-provider detection mid-session.
+ * Production builds compile this constant to `false`.
+ */
+const MOCK_MODE = import.meta.env.DEV && isMockMode();
+
+/**
  * Single source of truth for wallet state.
  *
- * A previous implementation called `useWallet()` from every screen, which
- * created one adapter (and one mock wallet) per component. That meant the mock
- * exposed on `window.__mockWallet` was not necessarily the instance used by the
- * Resolve screen, and different parts of the UI could disagree about whether a
- * wallet was connected. This provider guarantees exactly one adapter instance
- * for the whole application.
+ * The adapter owns one provider subscription and pushes immutable connection
+ * snapshots to this provider. Every wallet account/network/lock event updates
+ * React state immediately; screens never need to poll.
  */
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [connection, setConnection] = React.useState<WalletConnection | null>(null);
@@ -44,13 +50,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // Mock mode is a development/E2E facility only. It is compiled out of
   // production builds by `import.meta.env.DEV` and can never be enabled on a
   // deployed build; mock results are never live testnet evidence.
-  const mock = import.meta.env.DEV && isMockMode();
+  const mock = MOCK_MODE;
 
   React.useEffect(() => {
     const adapter = new BeldexWalletAdapter();
     adapterRef.current = adapter;
 
     let cancelled = false;
+
+    const unsubscribe = adapter.onConnectionChange(() => {
+      if (!cancelled) setConnection(adapter.connectionState);
+    });
 
     (async () => {
       try {
@@ -86,14 +96,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    const unsubscribe = adapter.onConnectionChange(() => {
-      if (!cancelled) setConnection(adapter.connectionState);
-    });
-
     return () => {
       cancelled = true;
       unsubscribe();
+      adapter.clearProvider();
       if (adapterRef.current === adapter) adapterRef.current = null;
+      if (mockWeb3Ref.current) mockWeb3Ref.current = null;
     };
   }, [mock]);
 
@@ -128,7 +136,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return adapterRef.current?.getWeb3() ?? null;
   }, [mock]);
 
-  const isTestnet = connection ? connection.network === 'testnet' : false;
+  const isTestnet = connection ? isSupportedNetwork(connection.network) : false;
 
   const value: WalletContextValue = {
     connection,

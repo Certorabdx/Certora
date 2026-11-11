@@ -10,7 +10,18 @@
  * BeldexWeb3) so the rest of the application can be exercised end-to-end
  * without a real wallet extension installed.
  */
-import type { BeldexProvider, ConnectResult, Nettype, ResolveBnsResult } from '@bdxi/web3js';
+import type {
+  BeldexProvider,
+  ConnectResult,
+  GetNetworkResult,
+  Nettype,
+  ResolveBnsResult,
+} from '@bdxi/web3js';
+
+/** Testnet-shaped standard addresses (base58, 9-prefix, 95 chars). */
+export const MOCK_WALLET_ADDRESS = `9${'C'.repeat(94)}`;
+export const MOCK_TESTNET_ADDRESS_A = `9${'A'.repeat(94)}`;
+export const MOCK_TESTNET_ADDRESS_B = `9${'B'.repeat(94)}`;
 
 export interface MockWalletConfig {
   network?: Nettype;
@@ -33,12 +44,12 @@ class MockProvider implements BeldexProvider {
         return Promise.reject({ code: 4001, message: 'User rejected' });
       }
       return Promise.resolve<ConnectResult>({
-        address: this.config.address ?? 'BDXMockAddress123',
+        address: this.config.address ?? MOCK_WALLET_ADDRESS,
         network: this.config.network ?? 'testnet',
       });
     }
     if (method === 'bdx_getNetwork') {
-      return Promise.resolve({
+      return Promise.resolve<GetNetworkResult>({
         nettype: this.config.network ?? 'testnet',
         height: 1000,
         protocolVersion: 1,
@@ -48,14 +59,15 @@ class MockProvider implements BeldexProvider {
       if (this.config.resolveReject) {
         return Promise.reject({ code: -32603, message: 'Resolver failure' });
       }
+      const requestedName = (args.params as { name?: string } | undefined)?.name;
       const r = this.config.resolveResult ?? {
-        name: 'merchant.bdx',
-        address: 'BDXRecipientA',
+        name: requestedName ?? 'merchant.bdx',
+        address: MOCK_TESTNET_ADDRESS_A,
       };
       return Promise.resolve<ResolveBnsResult>({ name: r.name, address: r.address, verified: false });
     }
     if (method === 'bdx_getAddress') {
-      return Promise.resolve({ address: this.config.address ?? 'BDXMockAddress123' });
+      return Promise.resolve({ address: this.config.address ?? MOCK_WALLET_ADDRESS });
     }
     if (method === 'bdx_disconnect') {
       return Promise.resolve(undefined);
@@ -99,7 +111,7 @@ class MockWeb3 {
     this.config = config;
     this.provider = new MockProvider(config);
     this._network = config.network ?? 'testnet';
-    this._address = config.address ?? 'BDXMockAddress123';
+    this._address = config.address ?? MOCK_WALLET_ADDRESS;
   }
 
   get isConnected(): boolean {
@@ -116,7 +128,7 @@ class MockWeb3 {
     const res = await this.provider.request({ method: 'bdx_connect' });
     this._connected = true;
     this._address = (res as ConnectResult).address;
-    this._network = (res as ConnectResult).network as Nettype;
+    this._network = (res as ConnectResult).network;
     this.provider.emit('connect', res);
     return res as ConnectResult;
   }
@@ -129,11 +141,11 @@ class MockWeb3 {
   }
 
   async getAddress(): Promise<string> {
-    return this._address!;
+    return this._address ?? MOCK_WALLET_ADDRESS;
   }
 
-  async getNetwork() {
-    return this.provider.request({ method: 'bdx_getNetwork' });
+  async getNetwork(): Promise<GetNetworkResult> {
+    return (await this.provider.request({ method: 'bdx_getNetwork' })) as GetNetworkResult;
   }
 
   async resolveBns(name: string): Promise<ResolveBnsResult> {
@@ -150,6 +162,23 @@ class MockWeb3 {
 
   setRejecting(reject: boolean): void {
     this.config.resolveReject = reject;
+  }
+
+  /** Test-only: simulate the wallet switching networks. */
+  setNetwork(network: Nettype): void {
+    this.config.network = network;
+    this._network = network;
+    this.provider.emit('networkChanged', { nettype: network });
+  }
+
+  /** Test-only: simulate the wallet switching accounts (null = wallet switch). */
+  setAddress(address: string | null): void {
+    this.config.address = address ?? undefined;
+    this._address = address;
+    if (address === null) {
+      this._connected = false;
+    }
+    this.provider.emit('accountsChanged', { address });
   }
 
   on(event: string, listener: (data: unknown) => void): void {
