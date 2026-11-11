@@ -137,8 +137,8 @@
 
 ## Phase 14 — Vercel deployment preparation (2026-11-11)
 - Added `vercel.json`: Vite framework preset, `npm ci`, `npm run build`, `dist` output, SPA rewrite to `/index.html`, security headers, and immutable caching for hashed `/assets/` files.
-- Created `docs/vercel-deployment.md` with GitHub import steps, the required settings, post-deploy checks, deployment boundaries, rollback, and custom-domain notes.
-- Added a **Deploy on Vercel** section to `README.md`.
+- Created `docs/vercel-deployment.md` with the build contract, post-deployment checks, boundaries, rollback, and custom-domain notes.
+- Kept deployment instructions out of `README.md`; the README remains focused on the product, local development, and verification.
 - No Content-Security-Policy is set yet; it must be tested against the Beldex Wallet extension before enabling.
 - No deployment was performed. Importing the repository requires the owner's Vercel account.
 - Re-ran the production build and configuration validation after adding the deployment files.
@@ -148,5 +148,4 @@
 - Remaining blockers: the faucet Turnstile challenge requires human interaction, the faucet pays 205 tBDX per 24 h versus a 650 tBDX one-year BNS fee, and public Testnet currently has zero BNS records.
 - To complete validation, fund the temporary address with **≥650 tBDX plus fees** (or manually solve the faucet CAPTCHA across multiple days, which still does not solve the zero-name problem), register a Testnet BNS name, then follow `docs/testnet-runbook.md` and record the real transaction hash and explorer link in `docs/testnet-validation.md`.
 - The mock E2E tests verify UI/workflow wiring only and are explicitly not live evidence.
-- The repository is deployment-ready for Vercel, but no deployment has been performed.
 - No deployment or real fund movements occurred. Repository: `https://github.com/Certorabdx/Certora`.

@@ -28,7 +28,7 @@ Core guarantees:
 ## Run locally
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -41,19 +41,6 @@ npm run build
 npm run preview
 ```
 
-The mock wallet is compiled out of production builds.
-
-## Deploy on Vercel
-
-The repository is ready for a direct Vercel import from GitHub; no environment variables are required.
-
-1. In Vercel, choose **Add New → Project** and import `Certorabdx/Certora`.
-2. Keep the root directory `./` and the detected **Vite** preset.
-3. Install with `npm ci`, build with `npm run build`, and output to `dist`.
-4. Deploy. Pushes to `main` create production deployments.
-
-[`vercel.json`](vercel.json) adds the SPA rewrite required by React Router, security headers, and immutable caching for hashed assets. See [Vercel deployment](docs/vercel-deployment.md) for the full checklist, rollback, and boundaries. A Vercel URL is a hosting endpoint, not Testnet validation evidence.
-
 ## Tests
 
 ```bash
@@ -64,7 +51,9 @@ npm run e2e           # Playwright E2E (mocked wallet)
 npm run build         # typecheck + production build
 ```
 
-Verified in this workspace:
+First E2E run: `npx playwright install chromium`.
+
+Current verification:
 
 | Check | Result |
 |-------|--------|
@@ -86,7 +75,7 @@ Appending `?mock=1` in a development build installs a fake wallet provider so UI
 
 ## Brand and interface
 
-The interface uses a warm near-black palette, Instrument Serif headlines, Geist UI text, Geist Mono for addresses and fingerprints, and a restrained amber accent. Fonts are self-hosted in `public/fonts/`; the app makes no third-party font requests at runtime. The brand mark is a “sealed destination” in `src/components/ui/LogoMark.tsx`, mirrored as static app and PWA icons. If the mark geometry changes, update the SVG and icon set together.
+The interface uses a warm near-black palette, Instrument Serif headlines, Geist UI text, Geist Mono for addresses and fingerprints, and a restrained amber accent. Fonts and icons are self-hosted; the brand mark lives in `src/components/ui/LogoMark.tsx` and is mirrored in the static app and PWA icons. Update both together if the mark changes.
 
 ## Screens
 
@@ -134,17 +123,12 @@ Fingerprint input: `certora-v1` + network + name + mapping type + exact destinat
 
 ## Documentation
 
-- [Technical research](docs/technical-research.md)
 - [Architecture](docs/architecture.md)
-- [UI research](docs/ui-research.md)
-- [Implementation plan](docs/implementation-plan.md)
-- [Execution log](docs/progress.md)
+- [Technical research](docs/technical-research.md)
 - [Threat model](docs/threat-model.md)
 - [Testnet runbook](docs/testnet-runbook.md)
-- [Testnet validation status](docs/testnet-validation.md)
-- [Repository audit](docs/repository-audit.md)
-- [Vercel deployment](docs/vercel-deployment.md)
+- [Testnet validation](docs/testnet-validation.md)
 
 ## Use
 
-MVP; the static build is ready for Vercel, but no hosted deployment has been performed. Testnet only. Do not use with Mainnet funds.
+MVP; Testnet only. Do not use with Mainnet funds.
